@@ -1,0 +1,21 @@
+2010-3-26 21:41:19
+创建文件
+Global setup:
+ Download and install Git
+  git config --global user.name "dongliang"
+  git config --global user.email zdl0812@163.com
+        
+Next steps:
+  mkdir Ocs_Scripts
+  cd Ocs_Scripts
+  git init
+  touch README
+  git add README
+  git commit -m 'first commit'
+  git remote add origin git@github.com:ganmao/Ocs_Scripts.git
+  git push origin master
+      
+Existing Git Repo?
+  cd existing_git_repo
+  git remote add origin git@github.com:ganmao/Ocs_Scripts.git
+  git push origin master
