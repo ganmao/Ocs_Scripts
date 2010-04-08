@@ -1,40 +1,40 @@
 def main(r):
-    #Ô¤ÊÕĞÍ×â·Ñ,Í¨¹ıÖÜÆÚ¿ªÊ¼Ê±¼ä²éProd_State
+    #é¢„æ”¶å‹ç§Ÿè´¹,é€šè¿‡å‘¨æœŸå¼€å§‹æ—¶é—´æŸ¥Prod_State
     prod_state = r.event.GetIndependProdState()
-    #»ñÈ¡Ëã·Ñ³¡¾°
+    #è·å–ç®—è´¹åœºæ™¯
     recurr_deal_mode = r.event.GetAttrEx(RECURRING_DEAL_MODE).AsInteger()
 
-    #N²»ÊÕ·Ñ,A°´ÌìÕÛËãÊÕÈ¡,E°´Õû¸öÕÊÆÚÊÕÈ¡
+    #Nä¸æ”¶è´¹,AæŒ‰å¤©æŠ˜ç®—æ”¶å–,EæŒ‰æ•´ä¸ªå¸æœŸæ”¶å–
     new_flag=&NEWCONNECTION&
     term_flag=&TERMINATION&
     normal_flag=&NORMAL&
 
-    #¿ÉÒÔÉèÖÃÃ¿ÌìÊÇ¶àÉÙÇ®£¬»òÕßÃ¿¸öÕÊÆÚ¶àÉÙÇ®
+    #å¯ä»¥è®¾ç½®æ¯å¤©æ˜¯å¤šå°‘é’±ï¼Œæˆ–è€…æ¯ä¸ªå¸æœŸå¤šå°‘é’±
     price_day=&PRICEBYDAY&
     price_cycle=&PRICEBYCYCLE&
 
-    #Èç¹û½çÃæÉèÖÃµÄÊÇ°´ÕÕÕÊÆÚ¼Æ·Ñ
+    #å¦‚æœç•Œé¢è®¾ç½®çš„æ˜¯æŒ‰ç…§å¸æœŸè®¡è´¹
     if(price_day == -1) :
-        #°´ÕÕÕûÕÊÆÚ¼ÆËãÖÜÆÚ·Ñ
+        #æŒ‰ç…§æ•´å¸æœŸè®¡ç®—å‘¨æœŸè´¹
         price_charge = (price_cycle * 1000 + 5)/10
-    #¼ÆËãÈÕ×â
+    #è®¡ç®—æ—¥ç§Ÿ
     else:
-        #Í¨¹ıÃ¿Ììµ¥¼ÛÀ©´ó100±¶,»ñµÃÒ»¸öÕÊÆÚµÄ·ÑÓÃ
+        #é€šè¿‡æ¯å¤©å•ä»·æ‰©å¤§100å€,è·å¾—ä¸€ä¸ªå¸æœŸçš„è´¹ç”¨
         price_charge = (price_day * 1000 + 5)/10
 
-    if (recurr_deal_mode == 0): #Õı³£Ëã·Ñ
-        first_cycle_flag = r.event.GetAttrEx(IS_FIRST_CYCLE).AsInteger() #ÊÇ·ñÊÇÊ×ÔÂ×âËã·Ñ
-        if (first_cycle_flag == 1): #Ê×ÔÂ×âËã·Ñ×Ó,½áºÏ×Ê·Ñ¼Æ»®±¾Éí×´Ì¬,È¥¼¤»î×´Ì¬×â·Ñ½ğ¶îÎª0
-            #ÊÕÈ¡²úÆ·ÖÜÆÚÊÂ¼ş×Ê·Ñ
+    if (recurr_deal_mode == 0): #æ­£å¸¸ç®—è´¹
+        first_cycle_flag = r.event.GetAttrEx(IS_FIRST_CYCLE).AsInteger() #æ˜¯å¦æ˜¯é¦–æœˆç§Ÿç®—è´¹
+        if (first_cycle_flag == 1): #é¦–æœˆç§Ÿç®—è´¹å­,ç»“åˆèµ„è´¹è®¡åˆ’æœ¬èº«çŠ¶æ€,å»æ¿€æ´»çŠ¶æ€ç§Ÿè´¹é‡‘é¢ä¸º0
+            #æ”¶å–äº§å“å‘¨æœŸäº‹ä»¶èµ„è´¹
             if(prod_state != ""):
-                #Èç¹û²úÆ·×´Ì¬ÊÇG»òA»òD
+                #å¦‚æœäº§å“çŠ¶æ€æ˜¯Gæˆ–Aæˆ–D
                 if(prod_state == "A" or prod_state == "G" or prod_state == "D"):
                     charge = price_charge
                 else:
                     charge = 0
             else:
                 charge = 0
-        else: #·ÇÊ×ÔÂ×âËã·Ñ,×Ê·Ñ¼Æ»®±¾Éí×´Ì¬È·¶¨½ğ¶î,È¥¼¤»î×´Ì¬×â·Ñ½ğ¶îÎª0
+        else: #éé¦–æœˆç§Ÿç®—è´¹,èµ„è´¹è®¡åˆ’æœ¬èº«çŠ¶æ€ç¡®å®šé‡‘é¢,å»æ¿€æ´»çŠ¶æ€ç§Ÿè´¹é‡‘é¢ä¸º0
             if(prod_state != ""):
                 if(prod_state == "A" or prod_state == "D"):
                     charge = price_charge
@@ -42,19 +42,19 @@ def main(r):
                     charge = 0
             else:
                 charge = 0
-    elif(recurr_deal_mode == 1): #³äÖµ²¹ÊÕ,²»ÒªÅĞ¶Ï×Ê·Ñ¼Æ»®×´Ì¬
+    elif(recurr_deal_mode == 1): #å……å€¼è¡¥æ”¶,ä¸è¦åˆ¤æ–­èµ„è´¹è®¡åˆ’çŠ¶æ€
         charge = price_charge
-    elif(recurr_deal_mode == 3): #ÓÃ»§×´Ì¬±ä¸ü
-        #ÓÃ»§×´Ì¬±ä¸üÇ°×´Ì¬
+    elif(recurr_deal_mode == 3): #ç”¨æˆ·çŠ¶æ€å˜æ›´
+        #ç”¨æˆ·çŠ¶æ€å˜æ›´å‰çŠ¶æ€
         pre_indep_prod_state = r.event.GetAttrEx(PRE_INDEP_PROD_STATE).AsString()
         if (pre_indep_prod_state == "G"):
-            #Ê×´Î¼¤»îÅĞ¶Ï
+            #é¦–æ¬¡æ¿€æ´»åˆ¤æ–­
             if(prod_state != ""):
                 charge = price_charge
             else:
                 charge = 0
         else:
-            #´Ë´¦±àĞ´·ÇÊ×´Î¼¤»î,²»ĞèÒªÅĞ¶Ï×Ê·Ñ¼Æ»®×´Ì¬
+            #æ­¤å¤„ç¼–å†™éé¦–æ¬¡æ¿€æ´»,ä¸éœ€è¦åˆ¤æ–­èµ„è´¹è®¡åˆ’çŠ¶æ€
             if(prod_state != ""):
                 charge = price_charge
             else:
@@ -62,5 +62,5 @@ def main(r):
     else:
         charge = 0
 
-    #½«·ÑÓÃËõĞ¡100±¶,ÔÙ´ÎËÄÉáÎåÈë
+    #å°†è´¹ç”¨ç¼©å°100å€,å†æ¬¡å››èˆäº”å…¥
     r.SetResult((charge+50)/100);
