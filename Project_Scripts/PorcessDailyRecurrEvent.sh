@@ -18,7 +18,7 @@ cd ${HOME}/bin
 v_LogFileName="PorcessDailyRecurrEvent_${gvDate_Today}.log"
 #日志等级,内容....
 v_LogLevel="1"
-v_LogContent="开始执行首月租收取程序..."
+v_LogContent="开始执行日租收取程序..."
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
 
 #KPI相关
@@ -124,14 +124,14 @@ END
 v_LogLevel="1"
 v_LogContent="开始运行日租事件生成进程..."
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
-${HOME}/bin/RecurrEventGen -e 3 -d ${gvDate_Today} -p 2 -l 5
+${HOME}/bin/RecurrEventGen -e 3 -d ${gvDate_Today} -p 2 -l 0
 
 v_LogLevel="1"
-v_LogContent="运行日租事件生成进程结束!开始运行手月租批价进程..."
+v_LogContent="运行日租事件生成进程结束!开始运行手日租批价进程..."
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
 
 #运行日租批价进程
-${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -l 5
+${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -l 0
 v_LogLevel="1"
 v_LogContent="运行日租批价进程结束!"
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
@@ -150,4 +150,4 @@ v_KpiContent="|DailyRecurrEventNum=${v_KpiProcAllNum}|DailyRecurrEventSuccesNum=
 
 gfWriteKpiFile ${v_KpiFileName} ${v_KpiName} ${v_KpiContent}
 
-gfInsertKpi2Oracle "处理每次月租和日租任务执行结束" "共需要处理的事件有:${v_KpiProcAllNum}" "已经入库的事件有:${v_KpiProcSuccesNum}" "处理错误的事件有:${v_KpiProcErrorNum}"
+gfInsertKpi2Oracle "处理日租任务执行结束" "共需要处理的事件有:${v_KpiProcAllNum}" "已经入库的事件有:${v_KpiProcSuccesNum}" "处理错误的事件有:${v_KpiProcErrorNum}"
