@@ -30,7 +30,7 @@ def main(r):
         #通过每天单价扩大100倍,获得一个帐期的费用
         price_charge = (price_day * 1000 + 5)/10
 
-    if (pass_days > 15):
+    if (pass_days >= 15):
         price_charge = price_charge / 2
 
     if (recurr_deal_mode == 0): #正常算费
