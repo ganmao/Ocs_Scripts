@@ -1,0 +1,413 @@
+#fOrTyTwO
+$hz=1000;
+$XS_VERSION='DProf 20080331.00';
+# All values are given in HZ
+$over_utime=47; $over_stime=0; $over_rtime=27;
+$over_tests=10000;
+$rrun_utime=46; $rrun_stime=47; $rrun_rtime=142;
+$total_marks=278                                                                                                                                                                               
+
+PART2
+@ 16 0 7
+& 2 main BEGIN
++ 2
+@ 0 0 20
+& 3 Net::Telnet BEGIN
++ 3
+@ 0 0 6
+& 4 strict bits
++ 4
+- 4
+& 5 strict import
++ 5
+- 5
+- 3
+& 6 Net::Telnet BEGIN
++ 6
+@ 0 15 4
+& 7 vars BEGIN
++ 7
+- 7
+& 8 vars BEGIN
++ 8
+@ 0 0 11
+& 9 warnings::register import
++ 9
+& a warnings::register mkMask
++ a
+- a
++ a
+- a
+- 9
+- 8
+& b vars BEGIN
++ b
++ 5
++ 4
+- 4
+- 5
+- b
+& c vars import
++ c
+- c
+- 6
+& d Net::Telnet BEGIN
++ d
+@ 0 16 6
+- d
+& e Net::Telnet BEGIN
++ e
+@ 0 0 2
+& f Socket BEGIN
++ f
+@ 0 0 4
+& 10 Exporter import
++ 10
+- 10
+- f
+& 11 Socket BEGIN
++ 11
++ 9
++ a
+- a
++ a
+- a
+- 9
+- 11
+& 12 Socket BEGIN
++ 12
+- 12
+@ 0 0 2
+& 13 Socket BEGIN
++ 13
+- 13
+& 14 XSLoader load
++ 14
+@ 0 0 4
+& 15 DynaLoader dl_load_file
++ 15
+@ 15 0 2
+- 15
+& 16 DynaLoader dl_undef_symbols
++ 16
+- 16
+& 17 DynaLoader dl_find_symbol
++ 17
+- 17
+& 18 DynaLoader dl_install_xsub
++ 18
+- 18
+& 19 Socket bootstrap
++ 19
+- 19
+- 14
++ 10
+- 10
+- e
+& 1a Net::Telnet BEGIN
++ 1a
+@ 0 0 4
+& 1b Symbol BEGIN
++ 1b
+- 1b
+@ 0 0 2
++ 10
+- 10
+- 1a
+& 1c Net::Telnet BEGIN
++ 1c
++ c
+- c
+- 1c
+& 1d Net::Telnet BEGIN
++ 1d
++ c
+- c
+- 1d
+@ 16 0 12
+& 1e Net::Telnet BEGIN
++ 1e
+& 1f strict unimport
++ 1f
++ 4
+- 4
+- 1f
+- 1e
+@ 0 0 5
+& 20 Net::Telnet BEGIN
++ 20
++ 1f
+- 1f
+- 20
+@ 0 0 2
+& 21 Net::Telnet _io_socket_include
++ 21
+@ 0 0 2
+& 22 IO::Socket BEGIN
++ 22
+@ 0 0 2
+& 23 IO::Handle BEGIN
++ 23
+- 23
+& 24 IO::Handle BEGIN
++ 24
++ 5
+- 5
+- 24
+& 25 IO::Handle BEGIN
++ 25
++ 10
+- 10
+- 25
+& 26 IO::Handle BEGIN
++ 26
++ 10
+- 10
+- 26
+& 27 IO::Handle BEGIN
++ 27
+@ 0 0 6
+& 28 SelectSaver BEGIN
++ 28
++ 10
+- 10
+- 28
+& 29 SelectSaver BEGIN
++ 29
++ 10
+- 10
+- 29
+- 27
+& 2a IO::Handle BEGIN
++ 2a
+@ 0 0 2
+& 2b IO BEGIN
++ 2b
+- 2b
+& 2c IO BEGIN
++ 2c
++ 10
+- 10
+- 2c
+& 2d IO BEGIN
++ 2d
++ 5
+- 5
+- 2d
+& 2e IO BEGIN
++ 2e
+& 2f warnings import
++ 2f
+- 2f
+- 2e
++ 14
+@ 0 0 4
++ 15
+@ 0 0 2
+- 15
++ 16
+- 16
++ 17
+- 17
++ 18
+- 18
+& 30 IO bootstrap
++ 30
+- 30
+- 14
+- 2a
+@ 0 0 2
+& 31 IO::Handle BEGIN
++ 31
++ 1f
++ 4
+- 4
+- 1f
+- 31
++ 10
+- 10
+- 22
+& 32 IO::Socket BEGIN
++ 32
+& 33 UNIVERSAL VERSION
++ 33
+- 33
++ 10
+@ 15 0 2
+- 10
+- 32
+& 34 IO::Socket BEGIN
++ 34
++ 10
+- 10
+- 34
+& 35 IO::Socket BEGIN
++ 35
++ 5
+- 5
+- 35
+& 36 IO::Socket BEGIN
++ 36
++ 10
+- 10
+- 36
+& 37 IO::Socket BEGIN
++ 37
+@ 0 0 2
+& 38 Errno BEGIN
++ 38
+- 38
+& 39 Errno BEGIN
++ 39
+@ 0 0 2
+& 3a Config BEGIN
++ 3a
++ 5
+- 5
+- 3a
+& 3b Config BEGIN
++ 3b
++ 1f
++ 4
+- 4
+- 1f
+- 3b
+@ 0 0 2
+& 3c version (bool
++ 3c
+- 3c
+& 3d version (cmp
++ 3d
+- 3d
+& 3e Config TIEHASH
++ 3e
+- 3e
+& 3f Config import
++ 3f
+- 3f
+- 39
+& 40 Errno BEGIN
++ 40
++ 5
+- 5
+- 40
+@ 0 0 2
+& 41 Errno BEGIN
++ 41
++ 1f
++ 4
+- 4
+- 1f
+- 41
+& 42 Config FETCH
++ 42
+- 42
++ 42
+- 42
+& 43 Errno TIEHASH
++ 43
+- 43
+@ 0 0 2
++ 10
+- 10
+- 37
+@ 0 0 3
+& 44 IO::Socket::INET BEGIN
++ 44
++ 5
+- 5
+- 44
+& 45 IO::Socket::INET BEGIN
++ 45
+& 46 IO::Socket import
++ 46
+& 47 Exporter export
++ 47
+& 48 Exporter as_heavy
++ 48
+@ 0 16 4
+& 49 Exporter::Heavy BEGIN
++ 49
++ 5
+- 5
+- 49
+& 4a Exporter::Heavy BEGIN
++ 4a
++ 1f
++ 4
+- 4
+- 1f
+- 4a
+@ 0 0 2
+& 4b Exporter::Heavy BEGIN
++ 4b
+& 4c warnings unimport
++ 4c
+- 4c
+- 4b
+@ 0 0 2
+- 48
+& 4d Exporter::Heavy heavy_export
+* 4d
+- 47
+- 46
+- 45
+& 4e IO::Socket::INET BEGIN
++ 4e
++ 10
+@ 0 0 2
+- 10
+- 4e
+& 4f IO::Socket::INET BEGIN
++ 4f
++ 10
+- 10
+- 4f
+& 50 IO::Socket::INET BEGIN
++ 50
++ 10
+- 10
+- 50
+& 51 IO::Socket::INET BEGIN
++ 51
++ 10
+- 10
+- 51
+@ 0 0 2
+& 52 IO::Socket register_domain
++ 52
+- 52
+@ 0 0 2
+& 53 IO::Socket::UNIX BEGIN
++ 53
++ 5
+- 5
+- 53
+& 54 IO::Socket::UNIX BEGIN
++ 54
++ 46
++ 47
++ 48
+- 48
+* 4d
+@ 0 0 2
+- 47
+- 46
+- 54
+& 55 IO::Socket::UNIX BEGIN
++ 55
++ 10
+- 10
+- 55
++ 52
+- 52
+- 21
+- 2
+& 56 main BEGIN
++ 56
++ 5
+- 5
+- 56
++ & Devel::DProf::write
+@ 16 0 2
+- & Devel::DProf::write
