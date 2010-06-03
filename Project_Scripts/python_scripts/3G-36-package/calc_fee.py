@@ -8,8 +8,9 @@ def calc(oIsFirstMonth,oUpdateStream,oStream,oAcmStream):
     v_PackageFee = 36 * 100.0                  #套餐包限定费用（分）
     v_PackageStream = 150 * 1024.0        #套餐包包的总流量（kb）
     
-    v_UpdateByte = round(oUpdateStream / 1024.0)    #获取到本次update的流量(kb)
     v_byte = round(oStream / 1024.0)                #获取到的是多次预留的总流量值（kb）
+    #v_UpdateByte = round(oUpdateStream / 1024.0)    #获取到本次update的流量(kb)
+    v_UpdateByte = v_byte
     v_SubsAcmValue = oAcmStream                     #获取累积量，请替换对应的累积量类型（kb）
     
     #将累积量加入总流量(kb)且四舍五入取整
