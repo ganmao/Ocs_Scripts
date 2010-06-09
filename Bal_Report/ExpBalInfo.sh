@@ -245,7 +245,7 @@ LoadBal2Ora()
     fi
     
     #将数据导入表中
-    sqlldr userid=${gvOraUser}/${gvOraPasswd}@${gvOraDsn} load=1000 silent=feedback control=${_BalFilePath}/${_BalTabName}.ctl log=${_BalFilePath}/${_BalTabName}.log bad=${_BalFilePath}/${_BalTabName}.bad
+    sqlldr userid=${gvOraUser}/${gvOraPasswd}@${gvOraDsn} silent=feedback control=${_BalFilePath}/${_BalTabName}.ctl log=${_BalFilePath}/${_BalTabName}.log bad=${_BalFilePath}/${_BalTabName}.bad
     pLog 3 "LoadBal2Ora" "将BAL信息导入Oracle中：${_BalTabName}"
 }
 

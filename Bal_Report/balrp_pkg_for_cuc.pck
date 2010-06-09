@@ -12,7 +12,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,2';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,2,52';
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -22,6 +22,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
 
   -- 定义日志等级
   GC_LOGING_LEVEL CONSTANT NUMBER := 5;
+
+  -- 最终报表存放表
+  GC_REPORT_TAB CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_report_tab_';
 
   -- 日志信息表
   GC_PROC_LOG CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_proc_log';
@@ -34,6 +37,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
 
   -- ACCT_BOOK中间表
   GC_ACCTBOOK_TAB_NAME CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_acctbook_';
+
+  -- 月信息中间表
+  GC_BAL_TAB_NAME CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_bal_';
 
   EXP_CREATE_TMP_TAB_ERR EXCEPTION;
   -- ==================================================
@@ -59,7 +65,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 判断某张表是否已经建立
   FUNCTION PF_JUDGE_TAB_EXIST(INV_TABLENAME USER_TABLES.TABLE_NAME%TYPE)
-    RETURN BOOLEAN;
+    RETURN NUMBER;
 
   -- 获取系统当前时间上个月帐期ID
   FUNCTION PF_GETLOCALCYCLEID
@@ -102,7 +108,12 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
 
   -- 处理入库的余额信息，创建索引
   PROCEDURE PP_COLLECT_BALINFO(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
-                               INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE);
+                               INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE,
+                               INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
+                               INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE);
+
+  -- 根据各个地市生成不同统计报表
+  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE);
 
   -- 日志打印
   PROCEDURE PP_PRINTLOG(INV_LOGLEVEL  NUMBER,
@@ -127,15 +138,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   PROCEDURE PP_MAIN(INV_PREBALTAB USER_TABLES.TABLE_NAME%TYPE,
                     INV_AFTBALTAB USER_TABLES.TABLE_NAME%TYPE) IS
     V_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE;
-    V_SQL            VARCHAR2(4000);
-    V_COUNT          NUMBER(10);
+    V_SQL            VARCHAR2(1000);
   BEGIN
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
                          GC_PROC_LOG);
   
     -- 判断日志信息表是否存在
     -- 不存在日志信息表则进行建立
-    IF PF_JUDGE_TAB_EXIST(GC_PROC_LOG) = FALSE THEN
+    IF PF_JUDGE_TAB_EXIST(GC_PROC_LOG) = 0 THEN
       DBMS_OUTPUT.PUT_LINE('日志信息表不存在，开始建立！' || GC_PROC_LOG);
     
       -- 创建用户日志信息表
@@ -164,44 +174,35 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();
   
     -- 采集用户信息数据
-    --PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
-    --PP_COLLECT_USERINFO(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
-    --PP_PRINTLOG(3, 'PP_MAIN', '00004', '采集用户信息完成！');
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
+    PP_COLLECT_USERINFO(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
+    PP_PRINTLOG(3, 'PP_MAIN', '00004', '采集用户信息完成！');
   
     -- 采集用户语音话单
-    /*    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
     PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');*/
+    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');
   
     -- 采集用户缴费信息
-    --PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
-    --PP_COLLECT_ACCTBOOK(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
-    --PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户缴费信息完成！');
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+    PP_COLLECT_ACCTBOOK(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户缴费信息完成！');
   
-    -- 检验用户余额表信息
-    IF PF_JUDGE_TAB_EXIST(INV_PREBALTAB) = TRUE AND
-       PF_JUDGE_TAB_EXIST(INV_AFTBALTAB) = TRUE THEN
-    
-      V_SQL := 'SELECT count(1) FROM '||INV_PREBALTAB;
-      EXECUTE IMMEDIATE V_SQL
-        INTO V_COUNT;
-        
-      PP_PRINTLOG(3,
-                  'PP_MAIN',
-                  0,
-                  '[' || INV_PREBALTAB || ']表含有记录：' || V_COUNT);
-    
-      V_SQL := 'SELECT count(1) FROM '||INV_AFTBALTAB;
-      EXECUTE IMMEDIATE V_SQL
-        INTO V_COUNT;
-        
-      PP_PRINTLOG(3,
-                  'PP_MAIN',
-                  0,
-                  '[' || INV_AFTBALTAB || ']表含有记录：' || V_COUNT);
-    END IF;
+    -- 采集用户余额表信息
+    -- 删除月初余额信息表
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'A_');
+    -- 删除月末余额信息表
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'B_');
+    PP_COLLECT_BALINFO(V_BILLINGCYCLEID,
+                       GC_BAL_TAB_NAME,
+                       INV_PREBALTAB,
+                       INV_AFTBALTAB);
+    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户余额信息完成！');
   
     PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
+    
+    -- 开始生成报表
+    PP_BUILD_REPORT(V_BILLINGCYCLEID);
   
     PP_PRINTLOG(1, 'PP_MAIN', 0, '程序执行完毕准备退出，回滚未提交事务！');
   
@@ -215,28 +216,28 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
 
   -------------------------------------------------------------------------------
   FUNCTION PF_JUDGE_TAB_EXIST(INV_TABLENAME USER_TABLES.TABLE_NAME%TYPE)
-    RETURN BOOLEAN IS
-    V_SQL VARCHAR2(100);
+    RETURN NUMBER IS
+    V_SQL      VARCHAR2(100);
+    V_TABLENUM NUMBER(1);
   BEGIN
-    V_SQL := 'SELECT 1 FROM ' || INV_TABLENAME || ' WHERE ROWNUM < 1';
+    /*    V_SQL := 'SELECT 1 FROM ' || INV_TABLENAME || ' WHERE ROWNUM < 1';
     EXECUTE IMMEDIATE V_SQL;
-    RETURN TRUE;
+    RETURN TRUE;*/
   
-  EXCEPTION
-    WHEN OTHERS THEN
-      DECLARE
-        ERROR_CODE NUMBER := SQLCODE;
-      BEGIN
-        IF ERROR_CODE = -942 THEN
-          PP_PRINTLOG(5,
-                      'PF_JUDGE_TAB_EXIST',
-                      SQLCODE,
-                      '表不存在：' || INV_TABLENAME);
-          RETURN FALSE;
-        ELSE
-          RETURN NULL;
-        END IF;
-      END;
+    V_SQL := 'SELECT count(1) FROM  user_tables where table_name = upper(''' ||
+             INV_TABLENAME || ''')';
+    EXECUTE IMMEDIATE V_SQL
+      INTO V_TABLENUM;
+  
+    IF V_TABLENUM = 1 THEN
+      RETURN 1;
+    ELSE
+      RETURN 0;
+      PP_PRINTLOG(5,
+                  'PF_JUDGE_TAB_EXIST',
+                  -942,
+                  '表不存在：' || INV_TABLENAME);
+    END IF;
   END;
 
   -------------------------------------------------------------------------------
@@ -303,14 +304,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                            INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE) IS
     V_SQL VARCHAR2(4000);
   BEGIN
-    IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = TRUE THEN
+    IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = 1 THEN
       V_SQL := 'truncate table ' || INV_TABLENAME || INV_BILLINGCYCLEID;
       EXECUTE IMMEDIATE V_SQL;
     
       V_SQL := 'drop table ' || INV_TABLENAME || INV_BILLINGCYCLEID;
       EXECUTE IMMEDIATE V_SQL;
     
-      IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = FALSE THEN
+      IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = 0 THEN
         PP_PRINTLOG(3,
                     'PP_DEL_TMP_TAB',
                     SQLCODE,
@@ -348,11 +349,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ';
     EXECUTE IMMEDIATE V_SQL;
   
-    IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = TRUE THEN
+    IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = 1 THEN
       PP_PRINTLOG(3,
                   'PP_COLLECT_USERINFO',
                   SQLCODE,
                   '表创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    
+      -- 创建表索引
+    
     END IF;
   END;
 
@@ -391,7 +395,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
-    IF PF_JUDGE_TAB_EXIST(V_TMP_TABLE || INV_BILLINGCYCLEID) = TRUE THEN
+    IF PF_JUDGE_TAB_EXIST(V_TMP_TABLE || INV_BILLINGCYCLEID) = 1 THEN
       PP_PRINTLOG(3,
                   'PP_COLLECT_CDR',
                   SQLCODE,
@@ -858,13 +862,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               AS
-              SELECT ACCT_ID, 200 "SERVICE_TYPE", sum(CHARGE_fee) "CHARGE_fee"
+              SELECT SUBS_ID, ACCT_ID, 200 "SERVICE_TYPE", sum(CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                WHERE CONTACT_CHANNEL_ID = 1
                  AND PARTY_CODE NOT IN (''999001'',''999999'')
                  AND ACCT_BOOK_TYPE IN (''H'',''P'')
                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID
+               GROUP BY ACCT_ID, SUBS_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -880,12 +884,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT ACCT_ID, 201 "SERVICE_TYPE", sum(CHARGE_fee)
+              SELECT SUBS_ID, ACCT_ID, 201 "SERVICE_TYPE", sum(CHARGE_FEE)
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                WHERE CONTACT_CHANNEL_ID = 4
                  AND ACCT_BOOK_TYPE IN (''H'',''P'')
                   OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID
+               GROUP BY SUBS_ID, ACCT_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -896,13 +900,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT ACCT_ID, 202 "SERVICE_TYPE", sum(CHARGE_fee)
+              SELECT SUBS_ID, ACCT_ID, 202 "SERVICE_TYPE", sum(CHARGE_FEE)
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                WHERE CONTACT_CHANNEL_ID = 1
                  AND PARTY_CODE = ''999001''
                  AND ACCT_BOOK_TYPE IN (''H'',''P'')
                   OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID
+               GROUP BY SUBS_ID, ACCT_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -913,12 +917,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 银行卡充值 SERVICE_TYPE = 203
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT ACCT_ID, 203 "SERVICE_TYPE", sum(CHARGE_fee)
+              SELECT SUBS_ID, ACCT_ID, 203 "SERVICE_TYPE", sum(CHARGE_FEE)
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                WHERE CONTACT_CHANNEL_ID = 10
                  AND ACCT_BOOK_TYPE IN (''H'',''P'')
                   OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID
+               GROUP BY SUBS_ID, ACCT_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -929,12 +933,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 空中充值 SERVICE_TYPE = 204
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT ACCT_ID, 204 "SERVICE_TYPE", sum(CHARGE_fee)
+              SELECT SUBS_ID, ACCT_ID, 204 "SERVICE_TYPE", sum(CHARGE_FEE)
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                WHERE CONTACT_CHANNEL_ID = 7
                  AND ACCT_BOOK_TYPE IN (''H'',''P'')
                   OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID
+               GROUP BY SUBS_ID, ACCT_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -949,9 +953,132 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
 
   -------------------------------------------------------------------------------
   PROCEDURE PP_COLLECT_BALINFO(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
-                               INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE) IS
+                               INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE,
+                               INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
+                               INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE) IS
+    V_SQL   VARCHAR2(1000);
+    V_COUNT NUMBER(10);
   BEGIN
-    NULL;
+    IF PF_JUDGE_TAB_EXIST(INV_TBAL_A) = 1 AND
+       PF_JUDGE_TAB_EXIST(INV_TBAL_B) = 1 THEN
+    
+      V_SQL := 'SELECT count(1) FROM ' || INV_TBAL_A;
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+    
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '[' || INV_TBAL_A || ']表含有记录：' || V_COUNT);
+    
+      -- 生成A表的中间表（筛选数据）
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || 'A_' ||
+               INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                AS
+                SELECT SA.SUBS_ID,
+                       B.ACCT_ID,
+                       SUM(B.GROSS_BAL) "GROSS_BAL",
+                       SUM(B.RESERVE_BAL) "RESERVE_BAL",
+                       SUM(B.CONSUME_BAL) "CONSUME_BAL"
+                  FROM ' || INV_TBAL_A ||
+               ' B, SUBS_ACCT@LINK_CC SA
+                 WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+                   AND B.ACCT_ID = SA.ACCT_ID(+)
+                 GROUP BY B.ACCT_ID, SA.SUBS_ID
+                ';
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '用户月初信息表收集完成：' || INV_TABLENAME || 'A_' ||
+                  INV_BILLINGCYCLEID);
+      COMMIT;
+    
+      V_SQL := 'SELECT count(1) FROM ' || INV_TBAL_B;
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+    
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '[' || INV_TBAL_B || ']表含有记录：' || V_COUNT);
+    
+      -- 生成B表的中间表（筛选数据）
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                AS
+                SELECT SA.SUBS_ID,
+                       B.ACCT_ID,
+                       SUM(B.GROSS_BAL) "GROSS_BAL",
+                       SUM(B.RESERVE_BAL) "RESERVE_BAL",
+                       SUM(B.CONSUME_BAL) "CONSUME_BAL"
+                  FROM ' || INV_TBAL_B ||
+               ' B, SUBS_ACCT@LINK_CC SA
+                 WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+                   AND B.ACCT_ID = SA.ACCT_ID(+)
+                 GROUP BY B.ACCT_ID, SA.SUBS_ID
+                ';
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '用户月末信息表收集完成：' || INV_TABLENAME || 'B_' ||
+                  INV_BILLINGCYCLEID);
+      COMMIT;
+    
+    END IF;
+  END;
+
+  -------------------------------------------------------------------------------
+  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE) IS
+    V_SQL VARCHAR2(1000);
+  BEGIN
+  
+    -- 开始生成内蒙报表
+    IF GC_PROVINCE = 'NM' THEN
+      V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                AS
+                SELECT U.ACC_NBR "用户号码",
+                       U.AREA_ID "地区ID",
+                       U.SUBS_CODE "用户标识",
+                       SUM(B1.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月初余额",
+                       SUM(A.CHARGE_FEE) "本月充值",
+                       SUM(C.CHARGE_FEE) "本月消费",
+                       SUM(B2.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月末余额"
+                  FROM ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || '        U,
+                       ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || ' B1,
+                       ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '    A,
+                       ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || '         C,
+                       ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || ' B2
+                 WHERE U.SUBS_ID = B1.SUBS_ID
+                   AND U.SUBS_ID = A.SUBS_ID
+                   AND U.SUBS_ID = C.SUBS_ID
+                   AND U.SUBS_ID = B2.SUBS_ID
+                 GROUP BY U.ACC_NBR, U.AREA_ID, U.SUBS_CODE
+                ';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+    ELSIF GC_PROVINCE = 'SD' THEN
+      NULL;
+    ELSIF GC_PROVINCE = 'HB' THEN
+      NULL;
+    ELSIF GC_PROVINCE = 'GS' THEN
+      NULL;
+    END IF;
+    
+    PP_PRINTLOG(3,
+                'PP_COLLECT_BALINFO',
+                0,
+                '用户余额报表生成完毕，见表：' || GC_REPORT_TAB || INV_BILLINGCYCLEID);
   END;
 
   -------------------------------------------------------------------------------
