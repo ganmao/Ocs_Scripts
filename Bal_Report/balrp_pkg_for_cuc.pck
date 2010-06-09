@@ -200,7 +200,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户余额信息完成！');
   
     PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
-    
+  
     -- 开始生成报表
     PP_BUILD_REPORT(V_BILLINGCYCLEID);
   
@@ -356,6 +356,15 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   '表创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
     
       -- 创建表索引
+      V_SQL := 'CREATE INDEX IDX_balrp_usr_sub' || INV_BILLINGCYCLEID ||
+               ' ON ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+    
+      PP_PRINTLOG(5,
+                  'PP_COLLECT_USERINFO',
+                  SQLCODE,
+                  '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
     
     END IF;
   END;
@@ -740,6 +749,17 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
              ' modify RE_ID null';
     EXECUTE IMMEDIATE V_SQL;
   
+    -- 创建表索引
+    V_SQL := 'CREATE INDEX IDX_balrp_cdr_sub' || INV_BILLINGCYCLEID ||
+             ' ON ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
+  
+    PP_PRINTLOG(5,
+                'PP_COLLECT_CDR',
+                SQLCODE,
+                '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+  
     ------------------删除临时表----------------------
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, V_TMP_TABLE);
   
@@ -799,23 +819,23 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 给临时表建立索引
-    V_SQL := 'CREATE INDEX IDX_ACCTBOOKTYPE_1 ON ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || '
+    V_SQL := 'CREATE INDEX IDX_ACCTBOOKTYPE_1' || INV_BILLINGCYCLEID ||
+             ' ON ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                            (ACCT_BOOK_TYPE) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
   
-    V_SQL := 'CREATE INDEX IDX_CONTACTCHANNELID_1 ON ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || '
+    V_SQL := 'CREATE INDEX IDX_CONTACTCHANNELID_1' || INV_BILLINGCYCLEID ||
+             ' ON ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                            (CONTACT_CHANNEL_ID) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
   
-    V_SQL := 'CREATE INDEX IDX_ACCTID_1 ON ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || '
+    V_SQL := 'CREATE INDEX IDX_ACCTID_1' || INV_BILLINGCYCLEID || ' ON ' ||
+             V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                            (ACCT_ID) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
   
-    V_SQL := 'CREATE INDEX IDX_PARTYCODE_1 ON ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || '
+    V_SQL := 'CREATE INDEX IDX_PARTYCODE_1' || INV_BILLINGCYCLEID || ' ON ' ||
+             V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                            (PARTY_CODE) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
   
@@ -947,6 +967,22 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
   
+    -- 创建表索引
+    V_SQL := 'CREATE INDEX IDX_balrp_acct_sub' || INV_BILLINGCYCLEID ||
+             ' ON ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
+  
+    V_SQL := 'CREATE INDEX IDX_balrp_acct_s' || INV_BILLINGCYCLEID ||
+             ' ON ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (SERVICE_TYPE) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
+  
+    PP_PRINTLOG(5,
+                'PP_COLLECT_ACCTBOOK',
+                SQLCODE,
+                '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+  
     ------------------删除临时表----------------------
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, V_TMP_ACCTOOK);
   END;
@@ -1028,6 +1064,22 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   INV_BILLINGCYCLEID);
       COMMIT;
     
+      -- 创建索引
+      V_SQL := 'CREATE INDEX IDX_balrp_bal_suba' || INV_BILLINGCYCLEID ||
+               ' ON ' || INV_TABLENAME || 'A_' || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+    
+      V_SQL := 'CREATE INDEX IDX_balrp_bal_subb' || INV_BILLINGCYCLEID ||
+               ' ON ' || INV_TABLENAME || 'B_' || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+    
+      PP_PRINTLOG(5,
+                  'PP_COLLECT_ACCTBOOK',
+                  SQLCODE,
+                  '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    
     END IF;
   END;
 
@@ -1065,20 +1117,65 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                  GROUP BY U.ACC_NBR, U.AREA_ID, U.SUBS_CODE
                 ';
       EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '用户余额报表生成完毕，见表：' || GC_REPORT_TAB || INV_BILLINGCYCLEID);
       COMMIT;
     
     ELSIF GC_PROVINCE = 'SD' THEN
-      NULL;
+      V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                AS
+                SELECT ' || INV_BILLINGCYCLEID ||
+               ' "帐务月份",
+                       U.AREA_ID "地市编码",
+                       SUM(B1.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "期初",
+                       SUM(A1.CHARGE_FEE) "现金缴费",
+                       SUM(A2.CHARGE_FEE) "开户预存款",
+                       SUM(A3.CHARGE_FEE) "一卡充",
+                       SUM(A4.CHARGE_FEE) "空中充值",
+                       SUM(C.CHARGE_FEE) "本期减少",
+                       SUM(B2.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月末余额"
+                  FROM ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U,
+                       ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || ' B1,
+                       (SELECT SUBS_ID, CHARGE_FEE
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         WHERE SERVICE_TYPE = 200
+                            OR SERVICE_TYPE = 203) A1,
+                       (SELECT SUBS_ID, CHARGE_FEE
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         WHERE SERVICE_TYPE = 202) A2,
+                       (SELECT SUBS_ID, CHARGE_FEE
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         WHERE SERVICE_TYPE = 201) A3,
+                       (SELECT SUBS_ID, CHARGE_FEE
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         WHERE SERVICE_TYPE = 204) A4,
+                       ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' C,
+                       ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || ' B2
+                 GROUP BY U.AREA_ID
+                ';
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_BALINFO',
+                  0,
+                  '用户余额报表生成完毕，见表：' || GC_REPORT_TAB || INV_BILLINGCYCLEID);
+      COMMIT;
     ELSIF GC_PROVINCE = 'HB' THEN
       NULL;
     ELSIF GC_PROVINCE = 'GS' THEN
       NULL;
     END IF;
-    
-    PP_PRINTLOG(3,
-                'PP_COLLECT_BALINFO',
-                0,
-                '用户余额报表生成完毕，见表：' || GC_REPORT_TAB || INV_BILLINGCYCLEID);
+  
   END;
 
   -------------------------------------------------------------------------------
