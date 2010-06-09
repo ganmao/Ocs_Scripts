@@ -23,6 +23,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- 定义日志等级
   GC_LOGING_LEVEL CONSTANT NUMBER := 5;
 
+  -- 日志信息表
+  GC_PROC_LOG CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_proc_log';
+
   -- 用户信息中间表
   GC_USER_TAB_NAME CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_user_';
 
@@ -70,10 +73,14 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   FUNCTION PF_GET_CYCLEENDIME(INV_CYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE)
     RETURN BILLING_CYCLE.CYCLE_END_DATE@LINK_CC%TYPE;
 
+  -- 返回当前设置省份
+  FUNCTION PF_CURR_PROVINCE RETURN CHAR;
+
   -- 定义过程
   -- ==================================================
   -- 过程调用引擎
-  PROCEDURE PP_MAIN;
+  PROCEDURE PP_MAIN(INV_PREBALTAB USER_TABLES.TABLE_NAME%TYPE,
+                    INV_AFTBALTAB USER_TABLES.TABLE_NAME%TYPE);
 
   -- 初始化，清空表中数据，在建立中间层表时调用
 
@@ -101,7 +108,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   PROCEDURE PP_PRINTLOG(INV_LOGLEVEL  NUMBER,
                         INV_FUNCNAME  VARCHAR2,
                         INV_LOGERRNUM VARCHAR2,
-                        IN_LOGTXT     VARCHAR2);
+                        INV_LOGTXT    VARCHAR2);
 
 END BALRP_PKG_FOR_CUC;
 /
@@ -117,11 +124,41 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   -- <VariableName> <Datatype>;
 
   -------------------------------------------------------------------------------
-  PROCEDURE PP_MAIN IS
+  PROCEDURE PP_MAIN(INV_PREBALTAB USER_TABLES.TABLE_NAME%TYPE,
+                    INV_AFTBALTAB USER_TABLES.TABLE_NAME%TYPE) IS
     V_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE;
+    V_SQL            VARCHAR2(4000);
+    V_COUNT          NUMBER(10);
   BEGIN
-    --初始化
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始进行初始化！');
+    DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
+                         GC_PROC_LOG);
+  
+    -- 判断日志信息表是否存在
+    -- 不存在日志信息表则进行建立
+    IF PF_JUDGE_TAB_EXIST(GC_PROC_LOG) = FALSE THEN
+      DBMS_OUTPUT.PUT_LINE('日志信息表不存在，开始建立！' || GC_PROC_LOG);
+    
+      -- 创建用户日志信息表
+      V_SQL := 'create table ' || GC_PROC_LOG || ' (
+                proc_time date,
+                log_level number(3),
+                log_fun varchar2(100),
+                log_err_no number(6),
+                log_txt varchar2(1000)
+                )
+                TABLESPACE TAB_RB
+                 ';
+      EXECUTE IMMEDIATE V_SQL;
+    
+    END IF;
+    -- DBMS_OUTPUT.PUT_LINE('日志信息表已经建立！' || GC_PROC_LOG);
+  
+    -- 初始化
+    PP_PRINTLOG(1,
+                'PP_MAIN',
+                0,
+                '-------------------------------------------------------------------------------');
+    PP_PRINTLOG(1, 'PP_MAIN', 0, '开始进行初始化！');
   
     -- 获取当天帐务周期ID
     V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();
@@ -132,13 +169,42 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     --PP_PRINTLOG(3, 'PP_MAIN', '00004', '采集用户信息完成！');
   
     -- 采集用户语音话单
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+    /*    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
     PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');
+    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');*/
   
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '初始化完成！');
+    -- 采集用户缴费信息
+    --PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+    --PP_COLLECT_ACCTBOOK(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+    --PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户缴费信息完成！');
   
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '程序执行完毕准备退出，回滚未提交事务！');
+    -- 检验用户余额表信息
+    IF PF_JUDGE_TAB_EXIST(INV_PREBALTAB) = TRUE AND
+       PF_JUDGE_TAB_EXIST(INV_AFTBALTAB) = TRUE THEN
+    
+      V_SQL := 'SELECT count(1) FROM '||INV_PREBALTAB;
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+        
+      PP_PRINTLOG(3,
+                  'PP_MAIN',
+                  0,
+                  '[' || INV_PREBALTAB || ']表含有记录：' || V_COUNT);
+    
+      V_SQL := 'SELECT count(1) FROM '||INV_AFTBALTAB;
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+        
+      PP_PRINTLOG(3,
+                  'PP_MAIN',
+                  0,
+                  '[' || INV_AFTBALTAB || ']表含有记录：' || V_COUNT);
+    END IF;
+  
+    PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
+  
+    PP_PRINTLOG(1, 'PP_MAIN', 0, '程序执行完毕准备退出，回滚未提交事务！');
+  
     ROLLBACK;
   EXCEPTION
     WHEN EXP_CREATE_TMP_TAB_ERR THEN
@@ -224,6 +290,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       FROM BILLING_CYCLE@LINK_CC
      WHERE BILLING_CYCLE_ID = INV_CYCLEID;
     RETURN V_END_DATE;
+  END;
+
+  -------------------------------------------------------------------------------
+  FUNCTION PF_CURR_PROVINCE RETURN CHAR IS
+  BEGIN
+    RETURN GC_PROVINCE;
   END;
 
   -------------------------------------------------------------------------------
@@ -318,7 +390,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ';
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
-    
+  
     IF PF_JUDGE_TAB_EXIST(V_TMP_TABLE || INV_BILLINGCYCLEID) = TRUE THEN
       PP_PRINTLOG(3,
                   'PP_COLLECT_CDR',
@@ -328,7 +400,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       PP_PRINTLOG(5,
                   'PP_COLLECT_CDR',
                   0,
-                  '插入EVNET_USAGE acct_item_type1数据完成！');
+                  '插入EVNET_USAGE acct_item_type1数据完成！' || V_TMP_TABLE ||
+                  INV_BILLINGCYCLEID);
     ELSE
       RAISE EXP_CREATE_TMP_TAB_ERR;
       PP_PRINTLOG(1, 'PP_COLLECT_CDR', -99001, '创建临时表失败！');
@@ -355,7 +428,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE acct_item_type2数据完成！');
+                '插入EVNET_USAGE acct_item_type2数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type3数据
@@ -379,7 +453,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE acct_item_type3数据完成！');
+                '插入EVNET_USAGE acct_item_type3数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type4数据
@@ -403,7 +478,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE acct_item_type4数据完成！');
+                '插入EVNET_USAGE acct_item_type4数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     ------------------数据/增值业务----------------------
@@ -428,7 +504,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE_C acct_item_type1数据完成！');
+                '插入EVNET_USAGE_C acct_item_type1数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type2数据
@@ -452,7 +529,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE_C acct_item_type2数据完成！');
+                '插入EVNET_USAGE_C acct_item_type2数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type3数据
@@ -476,7 +554,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE_C acct_item_type3数据完成！');
+                '插入EVNET_USAGE_C acct_item_type3数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type4数据
@@ -500,7 +579,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVNET_USAGE_C acct_item_type4数据完成！');
+                '插入EVNET_USAGE_C acct_item_type4数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     ------------------周期费RECURRING----------------------SERVICE_TYPE = 100
@@ -524,7 +604,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVENT_RECURRING acct_item_type1数据完成！');
+                '插入EVENT_RECURRING acct_item_type1数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type2数据
@@ -547,7 +628,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVENT_RECURRING acct_item_type2数据完成！');
+                '插入EVENT_RECURRING acct_item_type2数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type3数据
@@ -570,7 +652,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVENT_RECURRING acct_item_type3数据完成！');
+                '插入EVENT_RECURRING acct_item_type3数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type4数据
@@ -593,7 +676,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(5,
                 'PP_COLLECT_CDR',
                 0,
-                '插入EVENT_RECURRING acct_item_type4数据完成！');
+                '插入EVENT_RECURRING acct_item_type4数据完成！' || V_TMP_TABLE ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     ------------------周期费EVENT_CHARGE----------------------SERVICE_TYPE = 101
@@ -618,7 +702,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(5, 'PP_COLLECT_CDR', 0, '插入EVENT_CHARGE数据完成！');
+    PP_PRINTLOG(5,
+                'PP_COLLECT_CDR',
+                0,
+                '插入EVENT_CHARGE数据完成！' || V_TMP_TABLE || INV_BILLINGCYCLEID);
     COMMIT;
   
     ------------------数据合并----------------------
@@ -639,10 +726,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                GROUP BY SUBS_ID, SERVICE_TYPE, RE_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3, 'PP_COLLECT_CDR', 0, '话单信息收集完毕！');
+    PP_PRINTLOG(3,
+                'PP_COLLECT_CDR',
+                0,
+                '话单信息收集完毕！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-    
-    V_SQL := 'alter table ' || INV_TABLENAME || INV_BILLINGCYCLEID || ' modify RE_ID null';
+  
+    V_SQL := 'alter table ' || INV_TABLENAME || INV_BILLINGCYCLEID ||
+             ' modify RE_ID null';
     EXECUTE IMMEDIATE V_SQL;
   
     ------------------删除临时表----------------------
@@ -699,7 +790,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
-                '本帐期临时ACCT_BOOK表建立完毕！' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID);
+                '本帐期临时ACCT_BOOK表建立完毕！' || V_TMP_ACCTOOK ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 给临时表建立索引
@@ -726,7 +818,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
-                '本帐期临时ACCT_BOOK表索引建立完毕！' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID);
+                '本帐期临时ACCT_BOOK表索引建立完毕！' || V_TMP_ACCTOOK ||
+                INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 统计用户一次性费 SERVICE_TYPE = 102
@@ -785,8 +878,73 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '插入用户现金缴费完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
   
+    -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
+    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+              SELECT ACCT_ID, 201 "SERVICE_TYPE", sum(CHARGE_fee)
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+               WHERE CONTACT_CHANNEL_ID = 4
+                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
+                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
+               GROUP BY ACCT_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
+  
+    -- 统计用户 开户预存款 SERVICE_TYPE = 202
+    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+              SELECT ACCT_ID, 202 "SERVICE_TYPE", sum(CHARGE_fee)
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+               WHERE CONTACT_CHANNEL_ID = 1
+                 AND PARTY_CODE = ''999001''
+                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
+                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
+               GROUP BY ACCT_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户开户预存款数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
+  
+    -- 统计用户 银行卡充值 SERVICE_TYPE = 203
+    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+              SELECT ACCT_ID, 203 "SERVICE_TYPE", sum(CHARGE_fee)
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+               WHERE CONTACT_CHANNEL_ID = 10
+                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
+                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
+               GROUP BY ACCT_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户银行卡充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
+  
+    -- 统计用户 空中充值 SERVICE_TYPE = 204
+    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+              SELECT ACCT_ID, 204 "SERVICE_TYPE", sum(CHARGE_fee)
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+               WHERE CONTACT_CHANNEL_ID = 7
+                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
+                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
+               GROUP BY ACCT_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
+  
     ------------------删除临时表----------------------
-    -- PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, V_TMP_ACCTOOK);
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, V_TMP_ACCTOOK);
   END;
 
   -------------------------------------------------------------------------------
@@ -800,20 +958,30 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   PROCEDURE PP_PRINTLOG(INV_LOGLEVEL  NUMBER,
                         INV_FUNCNAME  VARCHAR2,
                         INV_LOGERRNUM VARCHAR2,
-                        IN_LOGTXT     VARCHAR2) IS
+                        INV_LOGTXT    VARCHAR2) IS
     V_CURTIME CHAR(14);
+    V_SQL     VARCHAR2(1000);
   BEGIN
     IF GC_LOGING_LEVEL >= INV_LOGLEVEL THEN
       SELECT TO_CHAR(SYSDATE, 'yyyymmddhh24miss') INTO V_CURTIME FROM DUAL;
     
       DBMS_OUTPUT.PUT_LINE(V_CURTIME || '[LOG_' || INV_LOGLEVEL || '|' ||
                            INV_LOGERRNUM || '|' || INV_FUNCNAME || ']' ||
-                           IN_LOGTXT);
+                           INV_LOGTXT);
+    
+      V_SQL := 'insert into ' || GC_PROC_LOG || '
+              values ( to_date(''' || V_CURTIME ||
+               ''',''yyyymmddhh24miss''),
+                       ' || INV_LOGLEVEL || ',
+                       ''' || INV_FUNCNAME || ''',
+                       ' || INV_LOGERRNUM || ',
+                       ''' || INV_LOGTXT || ''')';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
     END IF;
   END;
 
 BEGIN
-  -- Initialization
   DBMS_OUTPUT.ENABLE(BUFFER_SIZE => NULL);
 
 EXCEPTION
