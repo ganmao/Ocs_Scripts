@@ -202,7 +202,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
   
     -- 开始生成报表
-    PP_BUILD_REPORT(V_BILLINGCYCLEID);
+    --PP_BUILD_REPORT(V_BILLINGCYCLEID);
   
     PP_PRINTLOG(1, 'PP_MAIN', 0, '程序执行完毕准备退出，回滚未提交事务！');
   
@@ -726,17 +726,21 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               AS
-              SELECT SUBS_ID,
-                     SERVICE_TYPE,
-                     RE_ID,
-                     SUM(DURATION) "DURATION",
-                     SUM(DATA_BYTE) "DATA_BYTE",
-                     SUM(CHARGE_FEE) "CHARGE_FEE"
+              SELECT A.SUBS_ID,
+                     C.AREA_ID,
+                     A.SERVICE_TYPE,
+                     A.RE_ID,
+                     SUM(A.DURATION) "DURATION",
+                     SUM(A.DATA_BYTE) "DATA_BYTE",
+                     SUM(A.CHARGE_FEE) "CHARGE_FEE"
                 FROM BALRP_CDR_TMP_' || INV_BILLINGCYCLEID || ' A,
-                     ACCT_ITEM_TYPE@LINK_CC B
+                     ACCT_ITEM_TYPE@LINK_CC B,
+                     ' || GC_USER_TAB_NAME ||
+             INV_BILLINGCYCLEID || ' C
                WHERE A.ACCT_ITEM_TYPE_ID = B.ACCT_ITEM_TYPE_ID
                  AND B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-               GROUP BY SUBS_ID, SERVICE_TYPE, RE_ID
+                 AND A.SUBS_ID = C.SUBS_ID
+               GROUP BY C.AREA_ID,A.SUBS_ID, A.SERVICE_TYPE, A.RE_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -857,17 +861,20 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     V_SQL := 'insert into ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
-                  SELECT SUBS_ID,
+                  SELECT A.SUBS_ID,
+                         U.AREA_ID,
                          102 "SERVICE_TYPE",
                          '''' "RE_ID",
                          0 "DURATION",
                          0 "DATA_BYTE",
-                         SUM(CHARGE_FEE) "CHARGE_FEE"
+                         SUM(A.CHARGE_FEE) "CHARGE_FEE"
                     FROM ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || '
-                   WHERE ACCT_BOOK_TYPE = ''Q''
-                      OR (ACCT_BOOK_TYPE = ''V'' AND CHARGE_FEE > 0)
-                   GROUP BY ACCT_ID, SUBS_ID
+             INV_BILLINGCYCLEID || ' A,
+             ' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+                   WHERE (A.ACCT_BOOK_TYPE = ''Q''
+                      OR (A.ACCT_BOOK_TYPE = ''V'' AND A.CHARGE_FEE > 0))
+                     AND A.SUBS_ID = U.SUBS_ID
+                   GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -882,13 +889,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               AS
-              SELECT SUBS_ID, ACCT_ID, 200 "SERVICE_TYPE", sum(CHARGE_fee) "CHARGE_FEE"
-                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
-               WHERE CONTACT_CHANNEL_ID = 1
-                 AND PARTY_CODE NOT IN (''999001'',''999999'')
-                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
-                 OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY ACCT_ID, SUBS_ID
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 1
+                 AND A.PARTY_CODE NOT IN (''999001'',''999999'')
+                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
+                 AND A.SUBS_ID = U.SUBS_ID
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -904,12 +912,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT SUBS_ID, ACCT_ID, 201 "SERVICE_TYPE", sum(CHARGE_FEE)
-                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
-               WHERE CONTACT_CHANNEL_ID = 4
-                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
-                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY SUBS_ID, ACCT_ID
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 4
+                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
+                 AND A.SUBS_ID = U.SUBS_ID
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -920,13 +929,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT SUBS_ID, ACCT_ID, 202 "SERVICE_TYPE", sum(CHARGE_FEE)
-                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
-               WHERE CONTACT_CHANNEL_ID = 1
-                 AND PARTY_CODE = ''999001''
-                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
-                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY SUBS_ID, ACCT_ID
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 1
+                 AND A.PARTY_CODE = ''999001''
+                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
+                 AND A.SUBS_ID = U.SUBS_ID
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -937,12 +947,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 银行卡充值 SERVICE_TYPE = 203
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT SUBS_ID, ACCT_ID, 203 "SERVICE_TYPE", sum(CHARGE_FEE)
-                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
-               WHERE CONTACT_CHANNEL_ID = 10
-                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
-                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY SUBS_ID, ACCT_ID
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 203 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 10
+                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
+                 AND A.SUBS_ID = U.SUBS_ID
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -953,12 +964,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 统计用户 空中充值 SERVICE_TYPE = 204
     V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              SELECT SUBS_ID, ACCT_ID, 204 "SERVICE_TYPE", sum(CHARGE_FEE)
-                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
-               WHERE CONTACT_CHANNEL_ID = 7
-                 AND ACCT_BOOK_TYPE IN (''H'',''P'')
-                  OR (ACCT_BOOK_TYPE = ''V'' AND  CHARGE_fee < 0)
-               GROUP BY SUBS_ID, ACCT_ID
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 7
+                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
+                 AND A.SUBS_ID = U.SUBS_ID
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -1013,15 +1025,18 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 TABLESPACE TAB_RB
                 AS
                 SELECT SA.SUBS_ID,
+                       U.AREA_ID,
                        B.ACCT_ID,
                        SUM(B.GROSS_BAL) "GROSS_BAL",
                        SUM(B.RESERVE_BAL) "RESERVE_BAL",
                        SUM(B.CONSUME_BAL) "CONSUME_BAL"
                   FROM ' || INV_TBAL_A ||
-               ' B, SUBS_ACCT@LINK_CC SA
+               ' B, SUBS_ACCT@LINK_CC SA, ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                    AND B.ACCT_ID = SA.ACCT_ID(+)
-                 GROUP BY B.ACCT_ID, SA.SUBS_ID
+                   AND SA.SUBS_ID = U.SUBS_ID
+                 GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
                 ';
       EXECUTE IMMEDIATE V_SQL;
       PP_PRINTLOG(3,
@@ -1046,15 +1061,18 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 TABLESPACE TAB_RB
                 AS
                 SELECT SA.SUBS_ID,
+                       U.AREA_ID,
                        B.ACCT_ID,
                        SUM(B.GROSS_BAL) "GROSS_BAL",
                        SUM(B.RESERVE_BAL) "RESERVE_BAL",
                        SUM(B.CONSUME_BAL) "CONSUME_BAL"
                   FROM ' || INV_TBAL_B ||
-               ' B, SUBS_ACCT@LINK_CC SA
+               ' B, SUBS_ACCT@LINK_CC SA, ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                    AND B.ACCT_ID = SA.ACCT_ID(+)
-                 GROUP BY B.ACCT_ID, SA.SUBS_ID
+                   AND SA.SUBS_ID = U.SUBS_ID
+                 GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
                 ';
       EXECUTE IMMEDIATE V_SQL;
       PP_PRINTLOG(3,
