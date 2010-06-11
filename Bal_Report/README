@@ -1,3 +1,16 @@
+2010-06-11 9:21:45
+----------------------------------------
+王伟给的一个总部新需求，希望可以考虑进去
+1.		USERID	用户ID（与BSS 用户ID保持一致）		Y	Integer	20
+2.		ACCOUNTID	账户ID（与BSS 账户ID保持一致）		Y	Integer	20
+3.		CUSTOMERID	客户ID（与BSS 客户ID保持一致）		Y	Integer	20
+4.		MSISDN	用户号码		Y	String	20
+5.		STAT_MONTH	统计月份（格式为YYYYMM）		Y	String	6
+6.		MAIN_ACCTCON	主资金消费金额，不包含赠款消费（单位：厘）		Y	String	15
+7.		MAKEUP_FEE	最低消费补差金额，如用户承诺消费20元，但是当月只消费了5元，那么补差金额就是15元（20-5=15）（单位：厘）		N	String	15
+8.		MAIN_ACCTBAL	月结后主资金余额，不包含赠款 		Y	Sring	15
+9.		GIFT_FEE_USED	当月赠款消费金额（单位：厘）		N	String	15
+
 2010-06-10 10:45:08
 ----------------------------------------
 山东现场的一些特殊需求
