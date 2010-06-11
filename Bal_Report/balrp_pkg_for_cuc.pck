@@ -141,7 +141,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL            VARCHAR2(1000);
   BEGIN
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
-                         GC_PROC_LOG);
+                         GC_PROC_LOG || ',报表结果详见：' || GC_REPORT_TAB ||
+                         V_BILLINGCYCLEID);
   
     -- 判断日志信息表是否存在
     -- 不存在日志信息表则进行建立
@@ -202,7 +203,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
   
     -- 开始生成报表
-    --PP_BUILD_REPORT(V_BILLINGCYCLEID);
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_REPORT_TAB);
+    PP_BUILD_REPORT(V_BILLINGCYCLEID);
   
     PP_PRINTLOG(1, 'PP_MAIN', 0, '程序执行完毕准备退出，回滚未提交事务！');
   
@@ -1103,7 +1105,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
 
   -------------------------------------------------------------------------------
   PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE) IS
-    V_SQL VARCHAR2(1000);
+    V_SQL VARCHAR2(4000);
   BEGIN
   
     -- 开始生成内蒙报表
@@ -1147,40 +1149,76 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 AS
                 SELECT ' || INV_BILLINGCYCLEID ||
                ' "帐务月份",
-                       U.AREA_ID "地市编码",
-                       SUM(B1.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "期初",
-                       SUM(A1.CHARGE_FEE) "现金缴费",
-                       SUM(A2.CHARGE_FEE) "开户预存款",
-                       SUM(A3.CHARGE_FEE) "一卡充",
-                       SUM(A4.CHARGE_FEE) "空中充值",
-                       SUM(C.CHARGE_FEE) "本期减少",
-                       SUM(B2.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月末余额"
-                  FROM ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' U,
-                       ' || GC_BAL_TAB_NAME || 'A_' ||
-               INV_BILLINGCYCLEID || ' B1,
-                       (SELECT SUBS_ID, CHARGE_FEE
+                       A.AREA_ID "地市编码",
+                       NVL(ABS(SUM(B1.CHARGE_FEE)),0) "期初",
+                       NVL(ABS(SUM(A1.CHARGE_FEE)),0) "现金缴费",
+                       NVL(ABS(SUM(A2.CHARGE_FEE)),0) "开户预存款",
+                       NVL(ABS(SUM(A3.CHARGE_FEE)),0) "一卡充",
+                       NVL(ABS(SUM(A4.CHARGE_FEE)),0) "空中充值",
+                       NVL(ABS(SUM(C.CHARGE_FEE)),0) "本期减少",
+                       NVL(ABS(SUM(B2.CHARGE_FEE)),0) "月末余额",
+                       NVL(ABS(SUM(B3.CHARGE_FEE)),0) "月末余额（正）",
+                       NVL(ABS(SUM(B4.CHARGE_FEE)),0) "月末余额（负）",
+                       NVL((ABS(SUM(B2.CHARGE_FEE)) - ABS(SUM(B3.CHARGE_FEE)) +
+                       ABS(SUM(B4.CHARGE_FEE))),0) "校验"
+                  FROM AREA@LINK_CC A,
+                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
                           FROM ' || GC_ACCTBOOK_TAB_NAME ||
                INV_BILLINGCYCLEID || '
                          WHERE SERVICE_TYPE = 200
-                            OR SERVICE_TYPE = 203) A1,
-                       (SELECT SUBS_ID, CHARGE_FEE
+                            OR SERVICE_TYPE = 203
+                         GROUP BY AREA_ID) A1,
+                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
                           FROM ' || GC_ACCTBOOK_TAB_NAME ||
                INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 202) A2,
-                       (SELECT SUBS_ID, CHARGE_FEE
+                         WHERE SERVICE_TYPE = 202
+                         GROUP BY AREA_ID) A2,
+                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
                           FROM ' || GC_ACCTBOOK_TAB_NAME ||
                INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 201) A3,
-                       (SELECT SUBS_ID, CHARGE_FEE
+                         WHERE SERVICE_TYPE = 201
+                         GROUP BY AREA_ID) A3,
+                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
                           FROM ' || GC_ACCTBOOK_TAB_NAME ||
                INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 204) A4,
-                       ' || GC_CDR_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' C,
-                       ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || ' B2
-                 GROUP BY U.AREA_ID
+                         WHERE SERVICE_TYPE = 204
+                         GROUP BY AREA_ID) A4,
+                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+                          FROM ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY AREA_ID) C,
+                       (SELECT AREA_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY AREA_ID) B1,
+                       (SELECT AREA_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY AREA_ID) B2,
+                       (SELECT AREA_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                         WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) < 0
+                         GROUP BY AREA_ID) B3,
+                       (SELECT AREA_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                         WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) > 0
+                         GROUP BY AREA_ID) B4
+                 WHERE A.AREA_ID = B1.AREA_ID(+)
+                   AND A.AREA_ID = B2.AREA_ID(+)
+                   AND A.AREA_ID = C.AREA_ID(+)
+                   AND A.AREA_ID = A1.AREA_ID(+)
+                   AND A.AREA_ID = A2.AREA_ID(+)
+                   AND A.AREA_ID = A3.AREA_ID(+)
+                   AND A.AREA_ID = A4.AREA_ID(+)
+                   AND A.AREA_ID = B3.AREA_ID(+)
+                   AND A.AREA_ID = B4.AREA_ID(+)
+                 GROUP BY A.AREA_ID
                 ';
       EXECUTE IMMEDIATE V_SQL;
       PP_PRINTLOG(3,
