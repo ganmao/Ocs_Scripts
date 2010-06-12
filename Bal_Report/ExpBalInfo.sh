@@ -272,6 +272,16 @@ main()
             pLog 1 "main" "没有导出正确的BAL文件"
         fi
     elif [[ $1 = "-rep" ]]; then
+        if [[ x$2 = x ]]; then
+            pLog 1 "main" "月初余额表未输入！"
+            Usage
+            exit -1
+        elif [[ x$3 = x ]]; then
+            pLog 1 "main" "月末余额表未输入！"
+            Usage
+            exit -1
+        fi
+        
         pLog 1 "main" "输入月初余额信息表：[$2]"
         pLog 1 "main" "输入月末余额信息表：[$3]"
         
