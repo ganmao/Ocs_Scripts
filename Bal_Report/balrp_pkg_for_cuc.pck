@@ -12,7 +12,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
 
   -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
   GC_CPU_NUM CONSTANT NUMBER := 32;
@@ -146,7 +146,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
                          GC_PROC_LOG || ',报表结果详见：' || GC_REPORT_TAB ||
                          V_BILLINGCYCLEID);
-    EXECUTE IMMEDIATE 'alter session enable parallel dml';
+    --EXECUTE IMMEDIATE 'alter session enable parallel dml';
     -- 判断日志信息表是否存在
     -- 不存在日志信息表则进行建立
     IF PF_JUDGE_TAB_EXIST(GC_PROC_LOG) = 0 THEN
@@ -402,7 +402,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL := 'CREATE TABLE ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               AS
-              SELECT /*+ PARALLEL(EVENT_USAGE_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      SUM(DURATION) "DURATION",
@@ -438,7 +440,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE acct_item_type2数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      0 "DURATION",
@@ -463,7 +467,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE acct_item_type3数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      0 "DURATION",
@@ -488,7 +494,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE acct_item_type4数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      0 "DURATION",
@@ -514,7 +522,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     ------------------数据/增值业务----------------------
     -- 采集EVNET_USAGE_C acct_item_type1数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_C_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      SUM(DURATION) "DURATION",
@@ -539,7 +549,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE_C acct_item_type2数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_C_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      SUM(DURATION) "DURATION",
@@ -564,7 +576,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE_C acct_item_type3数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_C_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      SUM(DURATION) "DURATION",
@@ -589,7 +603,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVNET_USAGE_C acct_item_type4数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_USAGE_C_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      SERVICE_TYPE,
                      RE_ID,
                      SUM(DURATION) "DURATION",
@@ -615,7 +631,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     ------------------周期费RECURRING----------------------SERVICE_TYPE = 100
     -- 采集EVENT_RECURRING acct_item_type1数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_RECURRING_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      100 "SERVICE_TYPE",
                      RE_ID,
                      0 "DURATION",
@@ -639,7 +657,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVENT_RECURRING acct_item_type2数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_RECURRING_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      100 "SERVICE_TYPE",
                      RE_ID,
                      0 "DURATION",
@@ -663,7 +683,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVENT_RECURRING acct_item_type3数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_RECURRING_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      100 "SERVICE_TYPE",
                      RE_ID,
                      0 "DURATION",
@@ -687,7 +709,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     -- 采集EVENT_RECURRING acct_item_type4数据
     V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
-              SELECT /*+ PARALLEL(EVENT_RECURRING_' || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */ SUBS_ID,
+              SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */ SUBS_ID,
                      100 "SERVICE_TYPE",
                      RE_ID,
                      0 "DURATION",
@@ -742,7 +766,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               AS
-              SELECT /*+ PARALLEL(' || V_TMP_TABLE || INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM || ') */  A.SUBS_ID,
+              SELECT /*+ PARALLEL(' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+             ') */  A.SUBS_ID,
                      C.AREA_ID,
                      A.SERVICE_TYPE,
                      A.RE_ID,
@@ -909,12 +935,11 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 1
-                 AND (A.PARTY_CODE NOT IN (''999001'',''999999'') OR A.PARTY_CODE IS NULL)
+                 AND (A.PARTY_CODE != ''999001'' OR A.PARTY_CODE IS NULL)
                  AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
                  AND A.SUBS_ID = U.SUBS_ID
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
-               
     --dbms_output.put_line('V_SQL='||V_SQL);
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -956,6 +981,21 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                  AND A.SUBS_ID = U.SUBS_ID
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
+               
+    IF GC_PROVINCE = 'SD' THEN
+      V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                  FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+                 WHERE A.CONTACT_CHANNEL_ID = 1
+                   AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
+                   AND A.PARTY_CODE IS NOT NULL
+                   AND A.SUBS_ID = U.SUBS_ID
+                   --AND A.ACCT_RES_ID IN (''1'', ''32'')
+                 GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
+                 ';
+    END IF;
+    --dbms_output.put_line('V_SQL='||V_SQL);
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
@@ -1152,6 +1192,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                    AND U.SUBS_ID = B2.SUBS_ID
                  GROUP BY U.ACC_NBR, U.AREA_ID, U.SUBS_CODE
                 ';
+      dbms_output.put_line('V_SQL='||V_SQL);
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
     
@@ -1232,6 +1273,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                    AND A.AREA_ID = B4.AREA_ID(+)
                  GROUP BY A.AREA_ID
                 ';
+                
+      --dbms_output.put_line('V_SQL='||V_SQL);
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
     ELSIF GC_PROVINCE = 'HB' THEN

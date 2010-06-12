@@ -1,3 +1,15 @@
+2010-06-12 9:21:19
+----------------------------------------
+山东对两个统计的更新
+----开户预存
+SELECT t.* FROM acct_book t,payment a WHERE t.acct_book_id=a.payment_id AND 
+t.contact_channel_id=1 AND acct_book_type='P' and t.party_code is not null and t.acct_res_id in('1','32');
+
+---缴费
+ --现金缴费
+    SELECT t.* FROM acct_book t,payment a WHERE t.acct_book_id=a.payment_id AND t.contact_channel_id=1;
+    AND ((t.party_code NOT IN('999001','999999') or t.party_code is null) or (t.acct_book_type='H' and t.party_code='999999' and t.acct_res_id in(1,32)));
+
 2010-06-11 12:28:09
 ----------------------------------------
 开始测试山东的第一个版本
