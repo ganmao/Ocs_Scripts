@@ -15,7 +15,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
 
   -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
-  GC_CPU_NUM CONSTANT NUMBER := 32;
+  GC_CPU_NUM CONSTANT NUMBER := 18;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -146,7 +146,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
                          GC_PROC_LOG || ',报表结果详见：' || GC_REPORT_TAB ||
                          V_BILLINGCYCLEID);
-    --EXECUTE IMMEDIATE 'alter session enable parallel dml';
+    --EXECUTE IMMEDIATE 'ALTER SESSION ENABLE PARALLEL DML';
     -- 判断日志信息表是否存在
     -- 不存在日志信息表则进行建立
     IF PF_JUDGE_TAB_EXIST(GC_PROC_LOG) = 0 THEN
@@ -349,6 +349,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     --创建用户信息表,并且采集数据
     V_SQL := 'create table ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
+              NOLOGGING
               as 
               SELECT S.SUBS_ID,
                      S.ACC_NBR,
@@ -401,6 +402,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 创建CDR表,并且采集EVNET_USAGE acct_item_type1数据
     V_SQL := 'CREATE TABLE ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
+              NOLOGGING
               AS
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
@@ -439,7 +441,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     END IF;
   
     -- 采集EVNET_USAGE acct_item_type2数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -466,7 +468,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type3数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -493,7 +495,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type4数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -521,7 +523,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------数据/增值业务----------------------
     -- 采集EVNET_USAGE_C acct_item_type1数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -548,7 +550,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type2数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -575,7 +577,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type3数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -602,7 +604,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type4数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -630,7 +632,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------周期费RECURRING----------------------SERVICE_TYPE = 100
     -- 采集EVENT_RECURRING acct_item_type1数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -656,7 +658,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type2数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -682,7 +684,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type3数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -708,7 +710,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type4数据
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -738,7 +740,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- EVENT_CHARGE.STATE:'1'、未出帐，'2'、出帐中，'3'、已出帐、'4'、已销账、
     --                    '7'已注销--instalment state，不分期付款也使用。
     --                    不分期付款当作特殊的分期付款，只付一期。
-    V_SQL := 'insert into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT SUBS_ID,
                      101 "SERVICE_TYPE",
                      PRICE_ID "RE_ID",
@@ -765,6 +767,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 将采集的各个数据进行再次合并后放入正式CDR表
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
+              NOLOGGING
               AS
               SELECT /*+ PARALLEL(' || V_TMP_TABLE ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
@@ -832,6 +835,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 先将本帐期数据，且ACCT_BOOK_TYPE in ('H', 'P', 'Q', 'V')的数据放入临时表，以较少数据量
     V_SQL := 'CREATE TABLE ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
+              NOLOGGING
               AS
               SELECT SA.SUBS_ID,
                      AB.ACCT_ID,
@@ -902,7 +906,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
-    V_SQL := 'insert into ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert into /*+ APPEND */ ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
                   SELECT A.SUBS_ID,
                          U.AREA_ID,
                          102 "SERVICE_TYPE",
@@ -930,6 +934,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 999001是开户预存款，999999是预存转兑（可以在配置文件中配置）
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
+              NOLOGGING
               AS
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
@@ -954,7 +959,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
-    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -971,7 +976,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
-    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -983,7 +988,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ';
                
     IF GC_PROVINCE = 'SD' THEN
-      V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+      V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
                 SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                   FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
                ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1004,7 +1009,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 银行卡充值 SERVICE_TYPE = 203
-    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 203 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1021,7 +1026,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 空中充值 SERVICE_TYPE = 204
-    V_SQL := 'INSERT INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1081,6 +1086,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       V_SQL := 'CREATE TABLE ' || INV_TABLENAME || 'A_' ||
                INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
+                NOLOGGING
                 AS
                 SELECT SA.SUBS_ID,
                        U.AREA_ID,
@@ -1117,6 +1123,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       V_SQL := 'CREATE TABLE ' || INV_TABLENAME || 'B_' ||
                INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
+                NOLOGGING
                 AS
                 SELECT SA.SUBS_ID,
                        U.AREA_ID,
@@ -1168,6 +1175,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     IF GC_PROVINCE = 'NM' THEN
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
+                NOLOGGING
                 AS
                 SELECT U.ACC_NBR "用户号码",
                        U.AREA_ID "地区ID",
@@ -1199,6 +1207,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     ELSIF GC_PROVINCE = 'SD' THEN
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
+                NOLOGGING
                 AS
                 SELECT ' || INV_BILLINGCYCLEID ||
                ' "帐务月份",
@@ -1300,7 +1309,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                            INV_LOGERRNUM || '|' || INV_FUNCNAME || ']' ||
                            INV_LOGTXT);
     
-      V_SQL := 'insert into ' || GC_PROC_LOG || '
+      V_SQL := 'insert into /*+ APPEND */ ' || GC_PROC_LOG || '
               values ( to_date(''' || V_CURTIME ||
                ''',''yyyymmddhh24miss''),
                        ' || INV_LOGLEVEL || ',
@@ -1315,7 +1324,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
 BEGIN
   DBMS_OUTPUT.ENABLE(BUFFER_SIZE => NULL);
   --开启DML多CPU
-  EXECUTE IMMEDIATE 'alter session enable parallel dml';
+  EXECUTE IMMEDIATE 'ALTER SESSION ENABLE PARALLEL DML';
 
 EXCEPTION
   WHEN OTHERS THEN
