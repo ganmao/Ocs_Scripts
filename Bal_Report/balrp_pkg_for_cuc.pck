@@ -441,7 +441,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     END IF;
   
     -- 采集EVNET_USAGE acct_item_type2数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -468,7 +468,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type3数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -495,7 +495,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type4数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -523,7 +523,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------数据/增值业务----------------------
     -- 采集EVNET_USAGE_C acct_item_type1数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -550,7 +550,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type2数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -577,7 +577,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type3数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -604,7 +604,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type4数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -632,7 +632,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------周期费RECURRING----------------------SERVICE_TYPE = 100
     -- 采集EVENT_RECURRING acct_item_type1数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -658,7 +658,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type2数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -684,7 +684,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type3数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -710,7 +710,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type4数据
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -740,7 +740,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- EVENT_CHARGE.STATE:'1'、未出帐，'2'、出帐中，'3'、已出帐、'4'、已销账、
     --                    '7'已注销--instalment state，不分期付款也使用。
     --                    不分期付款当作特殊的分期付款，只付一期。
-    V_SQL := 'insert into /*+ APPEND */ ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
               SELECT SUBS_ID,
                      101 "SERVICE_TYPE",
                      PRICE_ID "RE_ID",
@@ -906,7 +906,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
-    V_SQL := 'insert into /*+ APPEND */ ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
                   SELECT A.SUBS_ID,
                          U.AREA_ID,
                          102 "SERVICE_TYPE",
@@ -959,7 +959,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
-    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -976,7 +976,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
-    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -988,7 +988,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ';
                
     IF GC_PROVINCE = 'SD' THEN
-      V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
                 SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                   FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
                ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1009,7 +1009,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 银行卡充值 SERVICE_TYPE = 203
-    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 203 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1026,7 +1026,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 空中充值 SERVICE_TYPE = 204
-    V_SQL := 'INSERT INTO /*+ APPEND */ ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1309,7 +1309,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                            INV_LOGERRNUM || '|' || INV_FUNCNAME || ']' ||
                            INV_LOGTXT);
     
-      V_SQL := 'insert into /*+ APPEND */ ' || GC_PROC_LOG || '
+      V_SQL := 'insert into ' || GC_PROC_LOG || '
               values ( to_date(''' || V_CURTIME ||
                ''',''yyyymmddhh24miss''),
                        ' || INV_LOGLEVEL || ',
