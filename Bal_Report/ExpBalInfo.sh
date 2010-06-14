@@ -9,25 +9,25 @@
 #-----------------------------------------------------
 gvMdbType="TT"      #TT/AB
 gvMdbDsn="ocs"
-gvMdbUser="ocs4cuc"
-gvMdbPasswd="ocs4cuc"
+gvMdbUser="ocs"
+gvMdbPasswd="jtwmy_TT"
 
 #ttisql "uid=ocs4cuc;pwd=ocs4cuc;dsn=ocs"
 #isql -u ocs -p ocs -s 127.0.0.1
 
 #ORACLE数据库配置
 #-----------------------------------------------------
-gvOraDsn="trb"
-gvOraUser="rb611"
-gvOraPasswd="smart"
+gvOraDsn="rb"
+gvOraUser="rb"
+gvOraPasswd="nsdss_RB"
 
 #内存库BAL表数据导出文件夹
 #-----------------------------------------------------
-gvBalBackPath="/ocs/cc611/scripts/rep/balbak"
+gvBalBackPath="/ztesoft/ocs/scripts/report/bal_bak"
 
 #余额报表输出目录
 #-----------------------------------------------------
-gvOutReportPath="/ocs/cc611/scripts/rep/repout"
+gvOutReportPath="/ztesoft/ocs/scripts/report/rep_out"
 
 #=====================================================
 #全局变量

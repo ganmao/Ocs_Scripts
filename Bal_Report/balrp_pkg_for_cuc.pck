@@ -9,13 +9,13 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
+  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
 
   -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
-  GC_CPU_NUM CONSTANT NUMBER := 18;
+  GC_CPU_NUM CONSTANT NUMBER := 24;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -441,7 +441,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     END IF;
   
     -- 采集EVNET_USAGE acct_item_type2数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -468,7 +469,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type3数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -495,7 +497,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE acct_item_type4数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -523,7 +526,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------数据/增值业务----------------------
     -- 采集EVNET_USAGE_C acct_item_type1数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -550,7 +554,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type2数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -577,7 +582,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type3数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -604,7 +610,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVNET_USAGE_C acct_item_type4数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_USAGE_C_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -632,7 +639,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------周期费RECURRING----------------------SERVICE_TYPE = 100
     -- 采集EVENT_RECURRING acct_item_type1数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -658,7 +666,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type2数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -684,7 +693,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type3数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -710,7 +720,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 采集EVENT_RECURRING acct_item_type4数据
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT /*+ PARALLEL(EVENT_RECURRING_' ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
              ') */ SUBS_ID,
@@ -740,7 +751,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- EVENT_CHARGE.STATE:'1'、未出帐，'2'、出帐中，'3'、已出帐、'4'、已销账、
     --                    '7'已注销--instalment state，不分期付款也使用。
     --                    不分期付款当作特殊的分期付款，只付一期。
-    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || V_TMP_TABLE ||
+             INV_BILLINGCYCLEID || '
               SELECT SUBS_ID,
                      101 "SERVICE_TYPE",
                      PRICE_ID "RE_ID",
@@ -906,7 +918,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
-    V_SQL := 'insert /*+ APPEND */ into ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'insert /*+ APPEND */ into ' || GC_CDR_TAB_NAME ||
+             INV_BILLINGCYCLEID || '
                   SELECT A.SUBS_ID,
                          U.AREA_ID,
                          102 "SERVICE_TYPE",
@@ -932,6 +945,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 创建用户缴费信息统计表
     -- 统计用户 现金缴费 SERVICE_TYPE = 200
     -- 999001是开户预存款，999999是预存转兑（可以在配置文件中配置）
+    -- 现在将999999归入先进缴费统计中,现场可以根据余额类型将其剔除
     V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
@@ -959,7 +973,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -976,7 +991,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -986,12 +1002,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                  AND A.SUBS_ID = U.SUBS_ID
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID
                ';
-               
+  
     IF GC_PROVINCE = 'SD' THEN
-      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
                 SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 202 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
-                  FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+                  FROM ' || V_TMP_ACCTOOK ||
+               INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U
                  WHERE A.CONTACT_CHANNEL_ID = 1
                    AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
                    AND A.PARTY_CODE IS NOT NULL
@@ -1009,7 +1027,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 银行卡充值 SERVICE_TYPE = 203
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 203 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1026,7 +1045,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     COMMIT;
   
     -- 统计用户 空中充值 SERVICE_TYPE = 204
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, 204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
              ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
@@ -1159,10 +1179,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       EXECUTE IMMEDIATE V_SQL;
     
       PP_PRINTLOG(5,
-                  'PP_COLLECT_ACCTBOOK',
+                  'PP_COLLECT_BALINFO',
                   SQLCODE,
                   '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    
+    ELSE
+      PP_PRINTLOG(1,
+                  'PP_COLLECT_BALINFO',
+                  SQLCODE,
+                  '传入的余额信息表不存在！A=' || INV_TBAL_A || ' B=' || INV_TBAL_B);
     END IF;
   END;
 
@@ -1200,9 +1224,6 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                    AND U.SUBS_ID = B2.SUBS_ID
                  GROUP BY U.ACC_NBR, U.AREA_ID, U.SUBS_CODE
                 ';
-      dbms_output.put_line('V_SQL='||V_SQL);
-      EXECUTE IMMEDIATE V_SQL;
-      COMMIT;
     
     ELSIF GC_PROVINCE = 'SD' THEN
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
@@ -1282,15 +1303,49 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                    AND A.AREA_ID = B4.AREA_ID(+)
                  GROUP BY A.AREA_ID
                 ';
-                
-      --dbms_output.put_line('V_SQL='||V_SQL);
-      EXECUTE IMMEDIATE V_SQL;
-      COMMIT;
+    
     ELSIF GC_PROVINCE = 'HB' THEN
+      -- 地市、号码、月初余额、月中充值、月中消费、月末余额。
+      -- 月初余额+月中充值-月中消费=月末余额
       NULL;
+      V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                NOLOGGING
+                AS
+                SELECT U.ACC_NBR "用户号码",
+                       U.AREA_ID "地市",
+                       NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0) "月初余额",
+                       NVL(SUM(A.CHARGE_FEE), 0) "月中充值",
+                       NVL(SUM(C.CHARGE_FEE), 0) "月中消费",
+                       NVL(SUM(BB.GROSS_BAL + BB.RESERVE_BAL + BB.CONSUME_BAL), 0) "月末余额",
+                       NVL((SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL) +
+                           SUM(A.CHARGE_FEE) - SUM(C.CHARGE_FEE)),
+                           0) "月末余额校验"
+                  FROM ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || '     U,
+                       ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || '    BA,
+                       ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' A,
+                       ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || '      C,
+                       ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID ||
+               '    BB
+                 WHERE U.SUBS_ID = BA.SUBS_ID(+)
+                   AND U.SUBS_ID = BA.SUBS_ID(+)
+                   AND U.SUBS_ID = A.SUBS_ID(+)
+                   AND U.SUBS_ID = C.SUBS_ID(+)
+                   AND U.SUBS_ID = BB.SUBS_ID(+)
+                 GROUP BY U.ACC_NBR, U.AREA_ID';
+    
     ELSIF GC_PROVINCE = 'GS' THEN
       NULL;
     END IF;
+  
+    DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
   
   END;
 
