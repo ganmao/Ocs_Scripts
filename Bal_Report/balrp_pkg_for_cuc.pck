@@ -9,13 +9,13 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
+  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
 
   -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
-  GC_CPU_NUM CONSTANT NUMBER := 18;
+  GC_CPU_NUM CONSTANT NUMBER := 24;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
