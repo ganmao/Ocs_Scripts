@@ -9,13 +9,13 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
+  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
 
   -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
-  GC_CPU_NUM CONSTANT NUMBER := 24;
+  GC_CPU_NUM CONSTANT NUMBER := 18;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -783,7 +783,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
               AS
               SELECT /*+ PARALLEL(' || V_TMP_TABLE ||
              INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
-             ') */  A.SUBS_ID,
+             ') */   A.SUBS_ID,
                      C.AREA_ID,
                      A.SERVICE_TYPE,
                      A.RE_ID,
@@ -791,13 +791,15 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      SUM(A.DATA_BYTE) "DATA_BYTE",
                      SUM(A.CHARGE_FEE) "CHARGE_FEE"
                 FROM ' || V_TMP_TABLE || INV_BILLINGCYCLEID || ' A,
-                     ACCT_ITEM_TYPE@LINK_CC B,
                      ' || GC_USER_TAB_NAME ||
-             INV_BILLINGCYCLEID || ' C
-               WHERE A.ACCT_ITEM_TYPE_ID = B.CU_AIT_ID
-                 AND B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+             INV_BILLINGCYCLEID || ' C,
+                     (SELECT DISTINCT CU_AIT_ID
+                        FROM ACCT_ITEM_TYPE@LINK_CC
+                       WHERE ACCT_RES_ID IN (' || GC_RES_TYPE ||
+             ')) B
+               WHERE A.ACCT_ITEM_TYPE_ID IN B.CU_AIT_ID
                  AND A.SUBS_ID = C.SUBS_ID
-               GROUP BY C.AREA_ID,A.SUBS_ID, A.SERVICE_TYPE, A.RE_ID
+               GROUP BY C.AREA_ID, A.SUBS_ID, A.SERVICE_TYPE, A.RE_ID
                ';
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
@@ -1226,6 +1228,40 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 ';
     
     ELSIF GC_PROVINCE = 'SD' THEN
+      -- 山东特殊处理
+      -- 删除测试号码的数据
+      V_SQL := 'delete from ' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID ||
+               ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+      V_SQL := 'delete from ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID ||
+               ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+      V_SQL := 'delete from ' || GC_ACCTBOOK_TAB_NAME || INV_BILLINGCYCLEID ||
+               ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+      V_SQL := 'delete from ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID ||
+               ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+      V_SQL := 'delete from ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID ||
+               ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+      
+      PP_PRINTLOG(3,
+                  'PP_BUILD_REPORT',
+                  SQLCODE,
+                  '删除测试用户数据完成！');
+    
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
                 NOLOGGING
