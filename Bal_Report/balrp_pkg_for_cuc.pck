@@ -1498,12 +1498,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                        NVL(SUM(A.CHARGE_FEE), 0) "月中充值",
                        NVL(SUM(C.CHARGE_FEE), 0) "月中消费",
                        NVL(SUM(BB.GROSS_BAL + BB.RESERVE_BAL + BB.CONSUME_BAL), 0) "月末余额",
-                       NVL((SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL) +
-                           SUM(A.CHARGE_FEE) - SUM(C.CHARGE_FEE)),
-                           0) "月末余额校验",
-                       NVL(NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0) + 
-                           NVL(SUM(A.CHARGE_FEE), 0) - 
-                           NVL(SUM(C.CHARGE_FEE), 0)) "本月自平衡余额"
+                       ABS(NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0)) +
+                       ABS(NVL(SUM(A.CHARGE_FEE), 0)) - ABS(NVL(SUM(C.CHARGE_FEE), 0)) "月末自平衡余额"
                   FROM ' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || '     U,
                        ' || GC_BAL_TAB_NAME || 'A_' ||
@@ -1526,7 +1522,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       NULL;
     END IF;
   
-    --DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
+    -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
