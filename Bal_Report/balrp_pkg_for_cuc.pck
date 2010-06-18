@@ -1267,15 +1267,27 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   '[' || INV_TBAL_B || ']表含有记录：' || V_COUNT);
     
       ------------------创建索引----------------------
-      V_SQL := 'CREATE INDEX IDX_balrp_t15' || INV_BILLINGCYCLEID || ' ON ' ||
-               INV_TBAL_B || '
-                           (ACCT_ID) TABLESPACE IDX_RB';
-      EXECUTE IMMEDIATE V_SQL;
+      V_SQL := 'SELECT count(1) FROM User_Objects WHERE object_name = upper(''IDX_balrp_t15' ||
+               INV_BILLINGCYCLEID || ''') AND OBJECT_TYPE = ''INDEX''';
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+      IF V_COUNT = 0 THEN
+        V_SQL := 'CREATE INDEX IDX_balrp_t15' || INV_BILLINGCYCLEID ||
+                 ' ON ' || INV_TBAL_B || '
+                             (ACCT_ID) TABLESPACE IDX_RB';
+        EXECUTE IMMEDIATE V_SQL;
+      END IF;
     
-      V_SQL := 'CREATE INDEX IDX_balrp_t16' || INV_BILLINGCYCLEID || ' ON ' ||
-               INV_TBAL_B || '
-                           (BAL_ID) TABLESPACE IDX_RB';
-      EXECUTE IMMEDIATE V_SQL;
+      V_SQL := 'SELECT count(1) FROM User_Objects WHERE object_name = upper(''IDX_balrp_t16' ||
+               INV_BILLINGCYCLEID || ''') AND OBJECT_TYPE = ''INDEX''';
+      EXECUTE IMMEDIATE V_SQL
+        INTO V_COUNT;
+      IF V_COUNT = 0 THEN
+        V_SQL := 'CREATE INDEX IDX_balrp_t16' || INV_BILLINGCYCLEID ||
+                 ' ON ' || INV_TBAL_B || '
+                             (BAL_ID) TABLESPACE IDX_RB';
+        EXECUTE IMMEDIATE V_SQL;
+      END IF;
     
       -- 生成B表的中间表（筛选数据）
       V_SQL := 'CREATE TABLE ' || INV_TABLENAME || 'B_' ||
