@@ -14,8 +14,8 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- 需要统计的余额类型
   GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
 
-  -- 指定采用CPU数,危险参数！需要根据现场cpu进行设置，一般为cpu的两倍
-  GC_CPU_NUM CONSTANT NUMBER := 24;
+  -- 指定CPU并发数,危险参数！
+  GC_CPU_NUM CONSTANT NUMBER := 18;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -1005,7 +1005,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '删除表中一次性费数据完成！' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID);
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
-  
+    
     V_SQL := 'insert \*+ APPEND *\ into ' || GC_CDR_TAB_NAME ||
              INV_BILLINGCYCLEID || '
                   SELECT A.SUBS_ID,
@@ -1500,7 +1500,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                        NVL(SUM(BB.GROSS_BAL + BB.RESERVE_BAL + BB.CONSUME_BAL), 0) "月末余额",
                        NVL((SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL) +
                            SUM(A.CHARGE_FEE) - SUM(C.CHARGE_FEE)),
-                           0) "月末余额校验"
+                           0) "月末余额校验",
+                       NVL(NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0) + 
+                           NVL(SUM(A.CHARGE_FEE), 0) - 
+                           NVL(SUM(C.CHARGE_FEE), 0)) "本月自平衡余额"
                   FROM ' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || '     U,
                        ' || GC_BAL_TAB_NAME || 'A_' ||
