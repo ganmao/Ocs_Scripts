@@ -941,7 +941,6 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
              ', ''yyyymmddhh24miss'')
                  AND AB.CREATED_DATE < to_date(' || V_END_DATE ||
              ', ''yyyymmddhh24miss'')
-                 --AND AB.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY SA.SUBS_ID,
                         AB.ACCT_ID,
                         AB.BAL_ID,
