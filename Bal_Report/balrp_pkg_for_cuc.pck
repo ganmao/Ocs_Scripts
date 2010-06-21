@@ -149,7 +149,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL            VARCHAR2(1000);
   BEGIN
     -- 获取上月帐务周期ID
-    V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();                  
+    V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();
   
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
                          GC_PROC_LOG || ',报表结果详见：' || GC_REPORT_TAB ||
@@ -1048,9 +1048,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || ' U
                  WHERE A.CONTACT_CHANNEL_ID = 1
-                   and A.PARTY_CODE = ''999999'' 
-                   and A.ACCT_BOOK_TYPE = (''H'')
+                   AND A.PARTY_CODE = ''999999'' 
+                   AND A.ACCT_BOOK_TYPE = (''H'')
                    AND A.SUBS_ID = U.SUBS_ID
+                   AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                  GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
@@ -1062,9 +1063,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
                ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 1
-                 and A.PARTY_CODE IS NULL 
-                 and ( A.ACCT_BOOK_TYPE = (''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0) )
+                 AND A.PARTY_CODE IS NULL 
+                 AND ( A.ACCT_BOOK_TYPE = (''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0) )
                  AND A.SUBS_ID = U.SUBS_ID
+                 AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
@@ -1530,29 +1532,43 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 AS
                 SELECT U.ACC_NBR "用户号码",
                        U.AREA_ID "地市",
-                       NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0) "月初余额",
-                       NVL(SUM(A.CHARGE_FEE), 0) "月中充值",
-                       NVL(SUM(C.CHARGE_FEE), 0) "月中消费",
-                       NVL(SUM(BB.GROSS_BAL + BB.RESERVE_BAL + BB.CONSUME_BAL), 0) "月末余额",
-                       ABS(NVL(SUM(BA.GROSS_BAL + BA.RESERVE_BAL + BA.CONSUME_BAL), 0)) +
-                       ABS(NVL(SUM(A.CHARGE_FEE), 0)) - ABS(NVL(SUM(C.CHARGE_FEE), 0)) "月末自平衡余额"
+                       ABS(NVL(BA.CHARGE_FEE, 0)) "月初余额",
+                       ABS(NVL(A.CHARGE_FEE, 0)) "月中充值",
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月中消费",
+                       ABS(NVL(BB.CHARGE_FEE, 0)) "月末余额",
+                       ABS(BA.CHARGE_FEE) + ABS(NVL(A.CHARGE_FEE, 0)) -
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月末自平衡余额"
                   FROM ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || '     U,
-                       ' || GC_BAL_TAB_NAME || 'A_' ||
-               INV_BILLINGCYCLEID || '    BA,
-                       ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' A,
-                       ' || GC_CDR_TAB_NAME ||
-               INV_BILLINGCYCLEID || '      C,
-                       ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID ||
-               '    BB
+               INV_BILLINGCYCLEID || ' U,
+                       (SELECT SUBS_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) BA,
+                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) A,
+                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) C,
+                       (SELECT SUBS_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) BB
                  WHERE U.SUBS_ID = BA.SUBS_ID(+)
                    AND U.SUBS_ID = BA.SUBS_ID(+)
                    AND U.SUBS_ID = A.SUBS_ID(+)
                    AND U.SUBS_ID = C.SUBS_ID(+)
                    AND U.SUBS_ID = BB.SUBS_ID(+)
-                 GROUP BY U.ACC_NBR, U.AREA_ID';
+                 GROUP BY U.ACC_NBR,
+                          U.AREA_ID,
+                          C.CHARGE_FEE,
+                          BA.CHARGE_FEE,
+                          A.CHARGE_FEE,
+                          BB.CHARGE_FEE';
     
     ELSIF GC_PROVINCE = 'GS' THEN
       NULL;
