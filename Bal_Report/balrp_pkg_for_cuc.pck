@@ -9,10 +9,10 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
+  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
 
   -- 指定CPU并发数,危险参数！
   GC_CPU_NUM CONSTANT NUMBER := 18;
@@ -148,6 +148,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE;
     V_SQL            VARCHAR2(1000);
   BEGIN
+    -- 获取上月帐务周期ID
+    V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();                  
+  
     DBMS_OUTPUT.PUT_LINE('开始调用存储过程[balrp_pkg_for_cuc.pp_main]，详细日志请见：' ||
                          GC_PROC_LOG || ',报表结果详见：' || GC_REPORT_TAB ||
                          V_BILLINGCYCLEID);
@@ -177,9 +180,6 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '-------------------------------------------------------------------------------');
     PP_PRINTLOG(1, 'PP_MAIN', 0, '开始进行初始化！');
-  
-    -- 获取上月帐务周期ID
-    V_BILLINGCYCLEID := PF_GETLOCALCYCLEID();
   
     -- 采集用户信息数据
     PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户信息...');
@@ -1037,23 +1037,59 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 统计用户 现金缴费 SERVICE_TYPE = 200
     -- 999001是开户预存款，999999是预存转兑（可以在配置文件中配置）
     -- 现在将999999归入先进缴费统计中,现场可以根据余额类型将其剔除
-    V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-              TABLESPACE TAB_RB
-              NOLOGGING
-              AS
+    IF GC_PROVINCE = 'SD' THEN
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                NOLOGGING
+                AS
+                SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID, 
+                       200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                  FROM ' || V_TMP_ACCTOOK ||
+               INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U
+                 WHERE A.CONTACT_CHANNEL_ID = 1
+                   and A.PARTY_CODE = ''999999'' 
+                   and A.ACCT_BOOK_TYPE = (''H'')
+                   AND A.SUBS_ID = U.SUBS_ID
+                 GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID, 
                      200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 1
-                 AND (A.PARTY_CODE != ''999001'' OR A.PARTY_CODE IS NULL)
-                 AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
+                 and A.PARTY_CODE IS NULL 
+                 and ( A.ACCT_BOOK_TYPE = (''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0) )
                  AND A.SUBS_ID = U.SUBS_ID
-                 AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
-               ';
-    --dbms_output.put_line('V_SQL='||V_SQL);
-    EXECUTE IMMEDIATE V_SQL;
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
+    ELSE
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                NOLOGGING
+                AS
+                SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID, 
+                       200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                  FROM ' || V_TMP_ACCTOOK ||
+               INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' U
+                 WHERE A.CONTACT_CHANNEL_ID = 1
+                   AND (A.PARTY_CODE != ''999001'' OR A.PARTY_CODE IS NULL)
+                   AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
+                   AND A.SUBS_ID = U.SUBS_ID
+                   AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+                 GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
+                 ';
+      --dbms_output.put_line('V_SQL='||V_SQL);
+      EXECUTE IMMEDIATE V_SQL;
+    END IF;
+  
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
@@ -1110,10 +1146,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || ' U
                  WHERE A.CONTACT_CHANNEL_ID = 1
-                   AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
+                   AND (A.ACCT_BOOK_TYPE = ''P'' OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
                    AND A.PARTY_CODE IS NOT NULL
                    AND A.SUBS_ID = U.SUBS_ID
-                   AND A.ACCT_RES_ID IN (''1'', ''32'')
+                   AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                  GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
                  ';
     END IF;

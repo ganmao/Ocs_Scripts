@@ -14,7 +14,7 @@ exec balrp_pkg_for_cuc.pp_main('balrp_bal_20100401', 'balrp_bal_20100501');
 山东核对数据
 开始进行河北的测试
 
-exec balrp_pkg_for_cuc.pp_main('balrp_bal_20100613150831', 'balrp_bal_20100613153802');
+exec balrp_pkg_for_cuc.pp_main('BALRP_BAL_20100611141058', 'BALRP_BAL_20100611141426');
 测试结果已经交给现场，等待现场验证
 
 
