@@ -9,13 +9,13 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
+  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
 
   -- 指定CPU并发数,危险参数！
-  GC_CPU_NUM CONSTANT NUMBER := 18;
+  GC_CPU_NUM CONSTANT NUMBER := 24;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -1615,7 +1615,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   PROCEDURE PP_INSERT_CHECK(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
                             INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
                             INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE) IS
-    V_SQL VARCHAR2(1000);
+    V_SQL VARCHAR2(4000);
   BEGIN
     -- 先删除表中已有本帐期的数据
     V_SQL := 'delete from CU_BAL_CHECK@link_cc where BILLING_CYCLE_ID =' ||
@@ -1631,22 +1631,39 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 插入本帐期数据
     V_SQL := 'INSERT INTO CU_BAL_CHECK@link_cc 
                      (acct_id, bal_id, PRE_CYCLE_BAL, DUE, CHARGE, CUR_CYCLE_BAL, BILLING_CYCLE_ID)
-              select a.acct_id,
-                     a.bal_id,
-                     nvl(SUM(c.GROSS_BAL + c.RESERVE_BAL + c.CONSUME_BAL),0) "PRE_CYCLE_BALANCE",
-                     nvl(SUM(b.charge_fee),0) "DUE",
-                     nvl(SUM(a.charge_fee),0) "CHARGE",
-                     nvl(SUM(d.GROSS_BAL + d.RESERVE_BAL + d.CONSUME_BAL),0) "CUR_CYCLE_BAL",
+              SELECT A.ACCT_ID,
+                     A.BAL_ID,
+                     NVL(C.CHARGE_FEE, 0) "PRE_CYCLE_BALANCE",
+                     NVL(B.CHARGE_FEE, 0) "DUE",
+                     NVL(A.CHARGE_FEE, 0) "CHARGE",
+                     NVL(D.CHARGE_FEE, 0) "CUR_CYCLE_BAL",
                      ''' || INV_BILLINGCYCLEID ||
              ''' "BILLING_CYCLE_ID"
-                from ' || GC_ACCTBOOK_TAB_NAME || 'tmp_' ||
-             INV_BILLINGCYCLEID || ' a, ' || GC_CDR_TAB_NAME || 'tmp_' ||
-             INV_BILLINGCYCLEID || ' b,  ' || INV_TBAL_A || ' c,' ||
-             INV_TBAL_B || ' d
-               where c.bal_id = b.bal_id
-                 and c.bal_id = a.bal_id
-                 and c.bal_id = d.bal_id
-               group by a.acct_id, a.bal_id
+                FROM (SELECT ACCT_ID, BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_ACCTBOOK_TAB_NAME ||
+             'tmp_' || INV_BILLINGCYCLEID || '
+                       GROUP BY ACCT_ID, BAL_ID) A,
+                     (SELECT BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_CDR_TAB_NAME || 'tmp_' ||
+             INV_BILLINGCYCLEID || '
+                       GROUP BY BAL_ID) B,
+                     (SELECT BAL_ID,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_A || '
+                       GROUP BY BAL_ID) C,
+                     (SELECT BAL_ID,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_B || '
+                       GROUP BY BAL_ID) D
+               WHERE C.BAL_ID = B.BAL_ID(+)
+                 AND C.BAL_ID = A.BAL_ID(+)
+                 AND C.BAL_ID = D.BAL_ID(+)
+               GROUP BY A.ACCT_ID,
+                        A.BAL_ID,
+                        A.CHARGE_FEE,
+                        B.CHARGE_FEE,
+                        C.CHARGE_FEE,
+                        D.CHARGE_FEE
               ';
     -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
     EXECUTE IMMEDIATE V_SQL;
