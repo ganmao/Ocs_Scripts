@@ -85,6 +85,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- 返回当前设置省份
   FUNCTION PF_CURR_PROVINCE RETURN CHAR;
 
+  -- 返回余额报表结果表的表名
+  FUNCTION PF_REP_TAB_NAME RETURN VARCHAR2;
+
   -- 定义过程
   -- ==================================================
   -- 过程调用引擎
@@ -122,6 +125,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   PROCEDURE PP_INSERT_CHECK(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
                             INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
                             INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE);
+
+  -- 清理中间表
+  PROCEDURE PP_CLEAR_TMP_TAB(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE);
 
   -- 日志打印
   PROCEDURE PP_PRINTLOG(INV_LOGLEVEL  NUMBER,
@@ -181,37 +187,39 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '-------------------------------------------------------------------------------');
     PP_PRINTLOG(1, 'PP_MAIN', 0, '开始进行初始化！');
   
-    -- 采集用户信息数据
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户信息...');
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
-    PP_COLLECT_USERINFO(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户信息完成！');
-  
-    -- 采集用户语音话单
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集CDR信息...');
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
-    PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');
-  
-    -- 采集用户缴费信息
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户缴费信息...');
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
-    PP_COLLECT_ACCTBOOK(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户缴费信息完成！');
-  
-    -- 采集用户余额表信息
-    -- 删除月初余额信息表
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户余额信息...');
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'A_');
-    -- 删除月末余额信息表
-    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'B_');
-    PP_COLLECT_BALINFO(V_BILLINGCYCLEID,
-                       GC_BAL_TAB_NAME,
-                       INV_PREBALTAB,
-                       INV_AFTBALTAB);
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户余额信息完成！');
-  
-    PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
+    IF GC_JUMP_COLLECT = FALSE THEN
+      -- 采集用户信息数据
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户信息...');
+      PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
+      PP_COLLECT_USERINFO(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户信息完成！');
+    
+      -- 采集用户语音话单
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集CDR信息...');
+      PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+      PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');
+    
+      -- 采集用户缴费信息
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户缴费信息...');
+      PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+      PP_COLLECT_ACCTBOOK(V_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户缴费信息完成！');
+    
+      -- 采集用户余额表信息
+      -- 删除月初余额信息表
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集用户余额信息...');
+      PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'A_');
+      -- 删除月末余额信息表
+      PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'B_');
+      PP_COLLECT_BALINFO(V_BILLINGCYCLEID,
+                         GC_BAL_TAB_NAME,
+                         INV_PREBALTAB,
+                         INV_AFTBALTAB);
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户余额信息完成！');
+    
+      PP_PRINTLOG(1, 'PP_MAIN', 0, '初始化完成！');
+    END IF;
   
     -- 开始生成报表
     PP_PRINTLOG(3, 'PP_MAIN', 0, '开始生成报表...');
@@ -224,6 +232,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     PP_PRINTLOG(3, 'PP_MAIN', 0, '开始插入CU_BAL_CHECK数据...');
     PP_INSERT_CHECK(V_BILLINGCYCLEID, INV_PREBALTAB, INV_AFTBALTAB);
+  
+    IF GC_TMP_TABLE_DEL = TRUE THEN
+      -- 开始删除中间表
+      PP_PRINTLOG(3, 'PP_MAIN', 0, '开始删除中间表...');
+      PP_CLEAR_TMP_TAB(V_BILLINGCYCLEID);
+    END IF;
   
     COMMIT;
   
@@ -275,10 +289,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
      WHERE ADD_MONTHS(SYSDATE, -1) >= CYCLE_BEGIN_DATE
        AND ADD_MONTHS(SYSDATE, -1) < CYCLE_END_DATE;
   
-    PP_PRINTLOG(3,
-                'pf_getLocalCycleId',
-                0,
-                '获取到帐期ID:' || V_BILLINGCYCLEID);
+    /*    PP_PRINTLOG(3,
+    'pf_getLocalCycleId',
+    0,
+    '获取到帐期ID:' || V_BILLINGCYCLEID);*/
   
     RETURN V_BILLINGCYCLEID;
   
@@ -320,6 +334,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   FUNCTION PF_CURR_PROVINCE RETURN CHAR IS
   BEGIN
     RETURN GC_PROVINCE;
+  END;
+
+  -------------------------------------------------------------------------------
+  FUNCTION PF_REP_TAB_NAME RETURN VARCHAR2 IS
+  BEGIN
+    RETURN GC_REPORT_TAB || PF_GETLOCALCYCLEID;
   END;
 
   -------------------------------------------------------------------------------
@@ -1578,6 +1598,17 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
+    -- 对生成的报表的处理
+    IF GC_PROVINCE = 'SD' THEN
+      V_SQL := ' UPDATE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || ' A
+                 SET "帐务月份" = (SELECT TO_NUMBER(TO_CHAR(CYCLE_BEGIN_DATE, ''YYYYMM ''))
+                     FROM BILLING_CYCLE@LINK_CC B
+                    WHERE A."帐务月份" = B.BILLING_CYCLE_ID)';
+      -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    END IF;
+  
   END;
 
   -------------------------------------------------------------------------------
@@ -1626,6 +1657,21 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 SQLCODE,
                 '插入CU_BAL_CHECK@link_cc表中[' || INV_BILLINGCYCLEID ||
                 ']帐期数据完成！');
+  END;
+
+  -------------------------------------------------------------------------------
+  PROCEDURE PP_CLEAR_TMP_TAB(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE) IS
+  BEGIN
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_USER_TAB_NAME);
+  
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CDR_TAB_NAME || 'TMP_');
+  
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME);
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_ACCTBOOK_TAB_NAME || 'TMP_');
+  
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'A_');
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'B_');
   END;
 
   -------------------------------------------------------------------------------
