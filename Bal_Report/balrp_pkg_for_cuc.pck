@@ -1674,6 +1674,31 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 SQLCODE,
                 '插入CU_BAL_CHECK@link_cc表中[' || INV_BILLINGCYCLEID ||
                 ']帐期数据完成！');
+  
+    -- 删除cu_bal_check表中acct_id为空的记录
+    V_SQL := 'DELETE FROM CU_BAL_CHECK@link_cc WHERE acct_id IS NULL AND billing_cycle_id = ' ||
+             INV_BILLINGCYCLEID;
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+  
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '删除cu_bal_check表中acct_id为空的记录');
+  
+    -- 更新cu_bal_check表中的余额类型
+    V_SQL := 'UPDATE CU_BAL_CHECK@LINK_CC A
+                 SET ACCT_RES_ID = (SELECT ACCT_RES_ID
+                        FROM ' || INV_TBAL_B || ' B
+                       WHERE B.BAL_ID = A.BAL_ID)
+               WHERE BILLING_CYCLE_ID = ' || INV_BILLINGCYCLEID;
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+  
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '更新cu_bal_check表中的余额类型');
   END;
 
   -------------------------------------------------------------------------------
