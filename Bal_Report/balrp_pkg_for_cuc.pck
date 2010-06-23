@@ -119,7 +119,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
                                INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE);
 
   -- 根据各个地市生成不同统计报表
-  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE);
+  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
+                            INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
+                            INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE);
 
   -- 更新cu_bal_check@link_cc中数据
   PROCEDURE PP_INSERT_CHECK(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
@@ -224,7 +226,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 开始生成报表
     PP_PRINTLOG(3, 'PP_MAIN', 0, '开始生成报表...');
     PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_REPORT_TAB);
-    PP_BUILD_REPORT(V_BILLINGCYCLEID);
+    PP_BUILD_REPORT(V_BILLINGCYCLEID, INV_PREBALTAB, INV_AFTBALTAB);
     PP_PRINTLOG(3,
                 'PP_MAIN',
                 0,
@@ -1398,7 +1400,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   END;
 
   -------------------------------------------------------------------------------
-  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE) IS
+  PROCEDURE PP_BUILD_REPORT(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
+                            INV_TBAL_A         USER_TABLES.TABLE_NAME%TYPE,
+                            INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE) IS
     V_SQL VARCHAR2(4000);
   BEGIN
   
@@ -1560,9 +1564,44 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     
     ELSIF GC_PROVINCE = 'HB' THEN
       -- 河北需要重新写，加入bal_id的信息
-      NULL;
+      V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
+                TABLESPACE TAB_RB
+                NOLOGGING
+                AS
+                SELECT BA.BAL_ID,
+                       ABS(NVL(BA.CHARGE_FEE, 0)) "月初余额",
+                       ABS(NVL(A.CHARGE_FEE, 0)) "月中充值",
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月中消费",
+                       ABS(NVL(BB.CHARGE_FEE, 0)) "月末余额",
+                       ABS(BA.CHARGE_FEE) + ABS(NVL(A.CHARGE_FEE, 0)) -
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月末自平衡余额"  
+                  FROM (SELECT BAL_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || INV_TBAL_A || '
+                         GROUP BY BAL_ID) BA,
+                       (SELECT BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               'tmp_' || INV_BILLINGCYCLEID || '
+                         GROUP BY BAL_ID) A,
+                       (SELECT BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_CDR_TAB_NAME || 'tmp_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY BAL_ID) C,
+                       (SELECT BAL_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || INV_TBAL_B || '
+                         GROUP BY BAL_ID) BB
+                   WHERE BA.BAL_ID = A.BAL_ID(+)
+                     AND BA.BAL_ID = C.BAL_ID(+)
+                     AND BA.BAL_ID = BB.BAL_ID(+)
+                   GROUP BY BA.BAL_ID,
+                            C.CHARGE_FEE,
+                            BA.CHARGE_FEE,
+                            A.CHARGE_FEE,
+                            BB.CHARGE_FEE
+                ';
     
-/*    ELSIF GC_PROVINCE = 'GS' THEN
+      /*    ELSIF GC_PROVINCE = 'GS' THEN
       NULL;*/
     END IF;
   
@@ -1579,6 +1618,17 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
+    ELSIF GC_PROVINCE = 'HB' THEN
+      -- 将 "月末自平衡余额"  插入bal_bak@link_cc表的 month_bal 字段
+      V_SQL := 'UPDATE BAL_BAK@LINK_CC A
+                   SET MONTH_BAL = (SELECT "月末自平衡余额"
+                                      FROM ' || GC_REPORT_TAB ||
+               INV_BILLINGCYCLEID || ' B
+                                     WHERE A.BAL_ID = B.BAL_ID)
+                     ';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+    
     END IF;
   
   END;
