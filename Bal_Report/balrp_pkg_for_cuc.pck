@@ -21,7 +21,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
 
   -- 定义是否跳过数据采集阶段直接进行报表输出(TRUE|FALSE)
-  GC_JUMP_COLLECT CONSTANT BOOLEAN := FALSE;
+  GC_JUMP_COLLECT CONSTANT BOOLEAN := TRUE;
 
   -- 定义日志等级
   GC_LOGING_LEVEL CONSTANT NUMBER := 5;
@@ -1377,13 +1377,13 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       COMMIT;
     
       -- 创建索引
-      V_SQL := 'CREATE INDEX IDX_balrp_bal_suba' || INV_BILLINGCYCLEID ||
-               ' ON ' || INV_TABLENAME || 'A_' || INV_BILLINGCYCLEID || '
+      V_SQL := 'CREATE INDEX IDX_balrp_t17' || INV_BILLINGCYCLEID || ' ON ' ||
+               INV_TABLENAME || 'A_' || INV_BILLINGCYCLEID || '
                            (SUBS_ID) TABLESPACE IDX_RB';
       EXECUTE IMMEDIATE V_SQL;
     
-      V_SQL := 'CREATE INDEX IDX_balrp_bal_subb' || INV_BILLINGCYCLEID ||
-               ' ON ' || INV_TABLENAME || 'B_' || INV_BILLINGCYCLEID || '
+      V_SQL := 'CREATE INDEX IDX_balrp_t18' || INV_BILLINGCYCLEID || ' ON ' ||
+               INV_TABLENAME || 'B_' || INV_BILLINGCYCLEID || '
                            (SUBS_ID) TABLESPACE IDX_RB';
       EXECUTE IMMEDIATE V_SQL;
     
@@ -1563,6 +1563,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 ';
     
     ELSIF GC_PROVINCE = 'HB' THEN
+      PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '开始执行河北报表生成!');
       -- 河北需要重新写，加入bal_id的信息
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
@@ -1609,6 +1610,11 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
+    PP_PRINTLOG(3,
+                'PP_BUILD_REPORT',
+                SQLCODE,
+                '报表生成完毕!' || GC_REPORT_TAB || INV_BILLINGCYCLEID);
+  
     -- 对生成的报表的处理
     IF GC_PROVINCE = 'SD' THEN
       V_SQL := ' UPDATE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || ' A
@@ -1618,16 +1624,35 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
+    
+      PP_PRINTLOG(3,
+                  'PP_BUILD_REPORT',
+                  SQLCODE,
+                  '山东更新帐务月份处理完毕！');
+                  
     ELSIF GC_PROVINCE = 'HB' THEN
+      V_SQL := 'CREATE INDEX IDX_balrp_t19' || INV_BILLINGCYCLEID || ' ON ' ||
+               GC_REPORT_TAB || INV_BILLINGCYCLEID || '
+                           (BAL_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+      
+      PP_PRINTLOG(3,
+                  'PP_BUILD_REPORT',
+                  SQLCODE,
+                  '建立山东报表所引完成'); 
+    
       -- 将 "月末自平衡余额"  插入bal_bak@link_cc表的 month_bal 字段
       V_SQL := 'UPDATE BAL_BAK@LINK_CC A
                    SET MONTH_BAL = (SELECT "月末自平衡余额"
                                       FROM ' || GC_REPORT_TAB ||
                INV_BILLINGCYCLEID || ' B
-                                     WHERE A.BAL_ID = B.BAL_ID)
+                                     WHERE B.BAL_ID = A.BAL_ID)
                      ';
+      DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
+    
+      PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '河北更新BAL_BAK表完成！');
     
     END IF;
   
