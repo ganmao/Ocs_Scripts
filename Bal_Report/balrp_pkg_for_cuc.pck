@@ -1403,34 +1403,50 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   BEGIN
   
     -- 开始生成内蒙报表
-    IF GC_PROVINCE = 'NM' THEN
+    IF GC_PROVINCE = 'NM' OR GC_PROVINCE = 'GS' THEN
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
                 NOLOGGING
                 AS
                 SELECT U.ACC_NBR "用户号码",
-                       U.AREA_ID "地区ID",
-                       U.SUBS_CODE "用户标识",
-                       SUM(B1.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月初余额",
-                       SUM(A.CHARGE_FEE) "本月充值",
-                       SUM(C.CHARGE_FEE) "本月消费",
-                       SUM(B2.GROSS_BAL + B1.RESERVE_BAL + B1.CONSUME_BAL) "月末余额"
+                       U.AREA_ID "地市",
+                       ABS(NVL(BA.CHARGE_FEE, 0)) "月初余额",
+                       ABS(NVL(A.CHARGE_FEE, 0)) "月中充值",
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月中消费",
+                       ABS(NVL(BB.CHARGE_FEE, 0)) "月末余额",
+                       ABS(BA.CHARGE_FEE) + ABS(NVL(A.CHARGE_FEE, 0)) -
+                       ABS(NVL(C.CHARGE_FEE, 0)) "月末自平衡余额"
                   FROM ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || '        U,
-                       ' || GC_BAL_TAB_NAME || 'A_' ||
-               INV_BILLINGCYCLEID || ' B1,
-                       ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '    A,
-                       ' || GC_CDR_TAB_NAME ||
-               INV_BILLINGCYCLEID || '         C,
-                       ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || ' B2
-                 WHERE U.SUBS_ID = B1.SUBS_ID
-                   AND U.SUBS_ID = A.SUBS_ID
-                   AND U.SUBS_ID = C.SUBS_ID
-                   AND U.SUBS_ID = B2.SUBS_ID
-                 GROUP BY U.ACC_NBR, U.AREA_ID, U.SUBS_CODE
-                ';
+               INV_BILLINGCYCLEID || ' U,
+                       (SELECT SUBS_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'A_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) BA,
+                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) A,
+                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                          FROM ' || GC_CDR_TAB_NAME ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) C,
+                       (SELECT SUBS_ID,
+                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+               INV_BILLINGCYCLEID || '
+                         GROUP BY SUBS_ID) BB
+                 WHERE U.SUBS_ID = BA.SUBS_ID(+)
+                   AND U.SUBS_ID = BA.SUBS_ID(+)
+                   AND U.SUBS_ID = A.SUBS_ID(+)
+                   AND U.SUBS_ID = C.SUBS_ID(+)
+                   AND U.SUBS_ID = BB.SUBS_ID(+)
+                 GROUP BY U.ACC_NBR,
+                          U.AREA_ID,
+                          C.CHARGE_FEE,
+                          BA.CHARGE_FEE,
+                          A.CHARGE_FEE,
+                          BB.CHARGE_FEE';
     
     ELSIF GC_PROVINCE = 'SD' THEN
       -- 山东特殊处理
@@ -1543,55 +1559,11 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 ';
     
     ELSIF GC_PROVINCE = 'HB' THEN
-      -- 地市、号码、月初余额、月中充值、月中消费、月末余额。
-      -- 月初余额+月中充值-月中消费=月末余额
+      -- 河北需要重新写，加入bal_id的信息
       NULL;
-      V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
-                TABLESPACE TAB_RB
-                NOLOGGING
-                AS
-                SELECT U.ACC_NBR "用户号码",
-                       U.AREA_ID "地市",
-                       ABS(NVL(BA.CHARGE_FEE, 0)) "月初余额",
-                       ABS(NVL(A.CHARGE_FEE, 0)) "月中充值",
-                       ABS(NVL(C.CHARGE_FEE, 0)) "月中消费",
-                       ABS(NVL(BB.CHARGE_FEE, 0)) "月末余额",
-                       ABS(BA.CHARGE_FEE) + ABS(NVL(A.CHARGE_FEE, 0)) -
-                       ABS(NVL(C.CHARGE_FEE, 0)) "月末自平衡余额"
-                  FROM ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' U,
-                       (SELECT SUBS_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'A_' ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY SUBS_ID) BA,
-                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
-                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY SUBS_ID) A,
-                       (SELECT SUBS_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
-                          FROM ' || GC_CDR_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY SUBS_ID) C,
-                       (SELECT SUBS_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY SUBS_ID) BB
-                 WHERE U.SUBS_ID = BA.SUBS_ID(+)
-                   AND U.SUBS_ID = BA.SUBS_ID(+)
-                   AND U.SUBS_ID = A.SUBS_ID(+)
-                   AND U.SUBS_ID = C.SUBS_ID(+)
-                   AND U.SUBS_ID = BB.SUBS_ID(+)
-                 GROUP BY U.ACC_NBR,
-                          U.AREA_ID,
-                          C.CHARGE_FEE,
-                          BA.CHARGE_FEE,
-                          A.CHARGE_FEE,
-                          BB.CHARGE_FEE';
     
-    ELSIF GC_PROVINCE = 'GS' THEN
-      NULL;
+/*    ELSIF GC_PROVINCE = 'GS' THEN
+      NULL;*/
     END IF;
   
     -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
