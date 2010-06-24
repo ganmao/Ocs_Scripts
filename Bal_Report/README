@@ -1,3 +1,37 @@
+2010-06-23 16:47:47
+----------------------------------------
+与王伟讨论的需求：
+
+还按这个做吧。 用户资料的临时表就不要删除了。
+1、在RB库重新生成一张CU_BAL_CHECK_XXX帐期的表，具体字段如下：
+    SUBS_ID,ACCT_ID,ACCT_RES_ID,PRE_CYCLE_BAL,DUE,CHARGE,CUR_CYCLE_BAL
+2、保证每个subs_id的每个ACCT_RES_ID只有一条记录，（同一个subs_id可能有多条记录）
+3、建立索引：SUBS_ID,ACCT_ID，ACCT_RES_ID
+
+我这边再关联用户资料临时表查询相关信息。
+
+SELECT S.SUBS_ID,
+       S.ACC_NBR,
+       S.AREA_ID,
+       S.SUBS_CODE,
+       S.CUST_ID,
+       C.CUST_CODE,
+       P.PROD_STATE,
+       P.BLOCK_REASON,
+       S.ACCT_ID "credit_acct",
+       SA.ACCT_ID,
+       A.ACCT_NBR
+  FROM SUBS@LINK_CC S, PROD@LINK_CC P, SUBS_ACCT@LINK_CC SA, ACCT@LINK_CC A,CUST@LINK_CC C
+ WHERE S.SUBS_ID = P.PROD_ID
+   AND S.CUST_ID = C.CUST_ID
+   AND S.SUBS_ID = SA.SUBS_ID
+   AND SA.ACCT_ID = A.ACCT_ID
+   AND SA.STATE = 'A'
+   AND SA.PRIORITY='999999999' AND SA.CU_AIT_ID= (SELECT CURRENT_VALUE FROM SYSTEM_PARAM t WHERE t.mask = 'DEFAULT_CU_AIT_ID');
+   
+其中 XXXX 取值为
+   SELECT CURRENT_VALUE FROM SYSTEM_PARAM t WHERE t.mask = 'DEFAULT_CU_AIT_ID';
+
 2010-06-22 16:14:50
 ----------------------------------------
 河北报表的修改：

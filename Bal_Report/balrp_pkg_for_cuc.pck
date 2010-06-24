@@ -21,7 +21,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
 
   -- 定义是否跳过数据采集阶段直接进行报表输出(TRUE|FALSE)
-  GC_JUMP_COLLECT CONSTANT BOOLEAN := TRUE;
+  GC_JUMP_COLLECT CONSTANT BOOLEAN := FALSE;
 
   -- 定义日志等级
   GC_LOGING_LEVEL CONSTANT NUMBER := 5;
@@ -43,6 +43,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
 
   -- 月信息中间表
   GC_BAL_TAB_NAME CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_bal_';
+
+  -- 新 CU_BAL_CHECK
+  GC_CU_BAL_CHECK CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_cu_bal_check_';
 
   EXP_CREATE_TMP_TAB_ERR EXCEPTION;
   -- ==================================================
@@ -232,7 +235,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '用户余额报表生成完毕，见表：' || GC_REPORT_TAB || V_BILLINGCYCLEID);
   
-    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始插入CU_BAL_CHECK数据...');
+    PP_PRINTLOG(3, 'PP_MAIN', 0, '开始新建CU_BAL_CHECK数据...');
+    PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CU_BAL_CHECK);
     PP_INSERT_CHECK(V_BILLINGCYCLEID, INV_PREBALTAB, INV_AFTBALTAB);
   
     IF GC_TMP_TABLE_DEL = TRUE THEN
@@ -377,6 +381,24 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     V_SQL VARCHAR2(4000);
   BEGIN
     --创建用户信息表,并且采集数据
+    /*    V_SQL := 'create table ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    TABLESPACE TAB_RB
+    NOLOGGING
+    as 
+    SELECT S.SUBS_ID,
+           S.ACC_NBR,
+           S.AREA_ID,
+           S.SUBS_CODE,
+           P.PROD_STATE,
+           P.BLOCK_REASON,
+           S.ACCT_ID "credit_acct",
+           SA.ACCT_ID
+      FROM SUBS@LINK_CC S, PROD@LINK_CC P, SUBS_ACCT@LINK_CC SA
+     WHERE S.SUBS_ID = P.PROD_ID
+       AND S.SUBS_ID = SA.SUBS_ID
+     ';*/
+  
+    -- 根据王伟提供的新脚本来获取
     V_SQL := 'create table ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
@@ -385,13 +407,27 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      S.ACC_NBR,
                      S.AREA_ID,
                      S.SUBS_CODE,
+                     S.CUST_ID,
+                     C.CUST_CODE,
                      P.PROD_STATE,
                      P.BLOCK_REASON,
-                     S.ACCT_ID "credit_acct",
-                     SA.ACCT_ID
-                FROM SUBS@LINK_CC S, PROD@LINK_CC P, SUBS_ACCT@LINK_CC SA
+                     S.ACCT_ID "CREDIT_ACCT",
+                     SA.ACCT_ID,
+                     A.ACCT_NBR
+                FROM SUBS@LINK_CC      S,
+                     PROD@LINK_CC      P,
+                     SUBS_ACCT@LINK_CC SA,
+                     ACCT@LINK_CC      A,
+                     CUST@LINK_CC      C
                WHERE S.SUBS_ID = P.PROD_ID
+                 AND S.CUST_ID = C.CUST_ID
                  AND S.SUBS_ID = SA.SUBS_ID
+                 AND SA.ACCT_ID = A.ACCT_ID
+                 AND SA.STATE = ''A''
+                 AND SA.PRIORITY = ''999999999''
+                 AND SA.CU_AIT_ID = (SELECT CURRENT_VALUE
+                                       FROM SYSTEM_PARAM@link_cc T
+                                      WHERE T.MASK = ''DEFAULT_CU_AIT_ID'')
                ';
   
     EXECUTE IMMEDIATE V_SQL;
@@ -406,6 +442,16 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       V_SQL := 'CREATE INDEX IDX_balrp_t1' || INV_BILLINGCYCLEID || ' ON ' ||
                INV_TABLENAME || INV_BILLINGCYCLEID || '
                            (SUBS_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+    
+      V_SQL := 'CREATE INDEX IDX_balrp_t20' || INV_BILLINGCYCLEID || ' ON ' ||
+               INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (ACCT_ID) TABLESPACE IDX_RB';
+      EXECUTE IMMEDIATE V_SQL;
+    
+      V_SQL := 'CREATE INDEX IDX_balrp_t21' || INV_BILLINGCYCLEID || ' ON ' ||
+               INV_TABLENAME || INV_BILLINGCYCLEID || '
+                           (CREDIT_ACCT) TABLESPACE IDX_RB';
       EXECUTE IMMEDIATE V_SQL;
     
       PP_PRINTLOG(5,
@@ -1629,17 +1675,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   'PP_BUILD_REPORT',
                   SQLCODE,
                   '山东更新帐务月份处理完毕！');
-                  
+    
     ELSIF GC_PROVINCE = 'HB' THEN
       V_SQL := 'CREATE INDEX IDX_balrp_t19' || INV_BILLINGCYCLEID || ' ON ' ||
                GC_REPORT_TAB || INV_BILLINGCYCLEID || '
                            (BAL_ID) TABLESPACE IDX_RB';
       EXECUTE IMMEDIATE V_SQL;
-      
-      PP_PRINTLOG(3,
-                  'PP_BUILD_REPORT',
-                  SQLCODE,
-                  '建立山东报表所引完成'); 
+    
+      PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '建立山东报表所引完成');
     
       -- 将 "月末自平衡余额"  插入bal_bak@link_cc表的 month_bal 字段
       V_SQL := 'UPDATE BAL_BAK@LINK_CC A
@@ -1664,7 +1707,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                             INV_TBAL_B         USER_TABLES.TABLE_NAME%TYPE) IS
     V_SQL VARCHAR2(4000);
   BEGIN
-    -- 先删除表中已有本帐期的数据
+    --与王伟商量后，决定不再采用cu_bal_check@link_cc表，我重新在rb库建立相应表
+    /*    -- 先删除表中已有本帐期的数据
     V_SQL := 'delete from CU_BAL_CHECK@link_cc where BILLING_CYCLE_ID =' ||
              INV_BILLINGCYCLEID;
     EXECUTE IMMEDIATE V_SQL;
@@ -1674,7 +1718,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 SQLCODE,
                 '删除CU_BAL_CHECK@link_cc表中[' || INV_BILLINGCYCLEID ||
                 ']帐期数据完成！');
-  
+    
     -- 插入本帐期数据
     V_SQL := 'INSERT INTO CU_BAL_CHECK@link_cc 
                      (acct_id, bal_id, PRE_CYCLE_BAL, DUE, CHARGE, CUR_CYCLE_BAL, BILLING_CYCLE_ID)
@@ -1711,7 +1755,62 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                         B.CHARGE_FEE,
                         C.CHARGE_FEE,
                         D.CHARGE_FEE
-              ';
+              ';*/
+    /*              
+    1、在RB库重新生成一张CU_BAL_CHECK_XXX帐期的表，具体字段如下：
+        SUBS_ID,ACCT_ID,ACCT_RES_ID,PRE_CYCLE_BAL,DUE,CHARGE,CUR_CYCLE_BAL
+    2、保证每个subs_id的每个ACCT_RES_ID只有一条记录，（同一个subs_id可能有多条记录）
+    3、建立索引：SUBS_ID,ACCT_ID，ACCT_RES_ID*/
+  
+    -- 删除临时表
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CU_BAL_CHECK || 'TMP1_');
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CU_BAL_CHECK || 'TMP2_');
+  
+    -- 创建本金账本的临时表
+    V_SQL := 'CREATE TABLE ' || GC_CU_BAL_CHECK || 'tmp1_' ||
+             INV_BILLINGCYCLEID || '
+              TABLESPACE TAB_RB
+              AS 
+              SELECT u.SUBS_ID,
+                     c.ACCT_ID,
+                     C.BAL_ID,
+                     NVL(C.CHARGE_FEE, 0) "PRE_CYCLE_BALANCE",
+                     NVL(B.CHARGE_FEE, 0) "DUE",
+                     NVL(A.CHARGE_FEE, 0) "CHARGE",
+                     NVL(D.CHARGE_FEE, 0) "CUR_CYCLE_BAL",
+                     c.acct_res_id
+                FROM ' || GC_USER_TAB_NAME ||
+             INV_BILLINGCYCLEID || ' u
+                ,(SELECT BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_ACCTBOOK_TAB_NAME ||
+             'tmp_' || INV_BILLINGCYCLEID || '
+                       GROUP BY BAL_ID) A,
+                     (SELECT SUBS_ID, BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_CDR_TAB_NAME || 'tmp_' ||
+             INV_BILLINGCYCLEID || '
+                       GROUP BY SUBS_ID, BAL_ID) B,
+                     (SELECT acct_res_id, BAL_ID, acct_id,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_A || '
+                       GROUP BY acct_res_id,BAL_ID,acct_id) C,
+                     (SELECT BAL_ID,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_B || '
+                       GROUP BY BAL_ID) D
+               WHERE C.BAL_ID = B.BAL_ID(+)
+                 AND C.BAL_ID = A.BAL_ID(+)
+                 AND C.BAL_ID = D.BAL_ID(+)
+                 AND c.acct_id = u.acct_id
+               GROUP BY u.SUBS_ID,
+                        c.ACCT_ID,
+                        C.BAL_ID,
+                        A.CHARGE_FEE,
+                        B.CHARGE_FEE,
+                        C.CHARGE_FEE,
+                        D.CHARGE_FEE,
+                        c.acct_res_id
+          ';
+  
     -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
@@ -1719,39 +1818,181 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3,
                 'PP_INSERT_CHECK',
                 SQLCODE,
-                '插入CU_BAL_CHECK@link_cc表中[' || INV_BILLINGCYCLEID ||
-                ']帐期数据完成！');
+                '新建临时表完成' || GC_CU_BAL_CHECK || 'tmp1_' ||
+                INV_BILLINGCYCLEID);
   
-    -- 删除cu_bal_check表中acct_id为空的记录
-    V_SQL := 'DELETE FROM CU_BAL_CHECK@link_cc WHERE acct_id IS NULL AND billing_cycle_id = ' ||
-             INV_BILLINGCYCLEID;
+    -- 创建信用账本的临时表
+    V_SQL := 'CREATE TABLE ' || GC_CU_BAL_CHECK || 'tmp2_' ||
+             INV_BILLINGCYCLEID || '
+              TABLESPACE TAB_RB
+              AS 
+              SELECT u.SUBS_ID,
+                     c.ACCT_ID,
+                     C.BAL_ID,
+                     NVL(C.CHARGE_FEE, 0) "PRE_CYCLE_BALANCE",
+                     NVL(B.CHARGE_FEE, 0) "DUE",
+                     NVL(A.CHARGE_FEE, 0) "CHARGE",
+                     NVL(D.CHARGE_FEE, 0) "CUR_CYCLE_BAL",
+                     c.acct_res_id
+                FROM ' || GC_USER_TAB_NAME ||
+             INV_BILLINGCYCLEID || ' u
+                ,(SELECT BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_ACCTBOOK_TAB_NAME ||
+             'tmp_' || INV_BILLINGCYCLEID || '
+                       GROUP BY BAL_ID) A,
+                     (SELECT SUBS_ID, BAL_ID, SUM(CHARGE_FEE) AS "CHARGE_FEE"
+                        FROM ' || GC_CDR_TAB_NAME || 'tmp_' ||
+             INV_BILLINGCYCLEID || '
+                       GROUP BY SUBS_ID, BAL_ID) B,
+                     (SELECT acct_res_id, BAL_ID, acct_id,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_A || '
+                       GROUP BY acct_res_id,BAL_ID,acct_id) C,
+                     (SELECT BAL_ID,
+                             SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
+                        FROM ' || INV_TBAL_B || '
+                       GROUP BY BAL_ID) D
+               WHERE C.BAL_ID = B.BAL_ID(+)
+                 AND C.BAL_ID = A.BAL_ID(+)
+                 AND C.BAL_ID = D.BAL_ID(+)
+                 AND c.acct_id = u.CREDIT_ACCT
+               GROUP BY u.SUBS_ID,
+                        c.ACCT_ID,
+                        C.BAL_ID,
+                        A.CHARGE_FEE,
+                        B.CHARGE_FEE,
+                        C.CHARGE_FEE,
+                        D.CHARGE_FEE,
+                        c.acct_res_id
+          ';
+  
+    -- DBMS_OUTPUT.PUT_LINE('V_SQL=' || V_SQL);
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+  
+    V_SQL := 'CREATE INDEX IDX_balrp_t25' || INV_BILLINGCYCLEID || ' ON ' ||
+             GC_CU_BAL_CHECK || 'tmp2_' || INV_BILLINGCYCLEID || '
+                           (SUBS_ID,ACCT_RES_ID) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
+  
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '新建临时表完成' || GC_CU_BAL_CHECK || 'tmp2_' ||
+                INV_BILLINGCYCLEID);
+  
+    -- 生成最终新的CU_BAL_CHECK表
+    V_SQL := 'CREATE TABLE ' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID || '
+              TABLESPACE TAB_RB
+              AS 
+              SELECT SUBS_ID,
+                     ACCT_ID,
+                     ACCT_RES_ID,
+                     SUM(PRE_CYCLE_BALANCE) "PRE_CYCLE_BALANCE",
+                     SUM(DUE) "DUE",
+                     SUM(CHARGE) "CHARGE",
+                     SUM(CUR_CYCLE_BAL) "CUR_CYCLE_BAL"
+                FROM ' || GC_CU_BAL_CHECK || 'tmp1_' ||
+             INV_BILLINGCYCLEID || '
+               GROUP BY SUBS_ID, ACCT_ID, ACCT_RES_ID
+               ';
     EXECUTE IMMEDIATE V_SQL;
     COMMIT;
   
     PP_PRINTLOG(3,
                 'PP_INSERT_CHECK',
                 SQLCODE,
-                '删除cu_bal_check表中acct_id为空的记录');
+                '新cu_bal_check表建立完成,插入本金账本数据：' || GC_CU_BAL_CHECK ||
+                INV_BILLINGCYCLEID);
   
-    -- 更新cu_bal_check表中的余额类型
-    V_SQL := 'UPDATE CU_BAL_CHECK@LINK_CC A
-                 SET ACCT_RES_ID = (SELECT ACCT_RES_ID
-                        FROM ' || INV_TBAL_B || ' B
-                       WHERE B.BAL_ID = A.BAL_ID)
-               WHERE BILLING_CYCLE_ID = ' || INV_BILLINGCYCLEID;
+    -- 建立索引
+    V_SQL := 'CREATE INDEX IDX_balrp_t22' || INV_BILLINGCYCLEID || ' ON ' ||
+             GC_CU_BAL_CHECK || INV_BILLINGCYCLEID || '
+                           (SUBS_ID) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
-    COMMIT;
+  
+    V_SQL := 'CREATE INDEX IDX_balrp_t23' || INV_BILLINGCYCLEID || ' ON ' ||
+             GC_CU_BAL_CHECK || INV_BILLINGCYCLEID || '
+                           (ACCT_ID) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
+  
+    V_SQL := 'CREATE INDEX IDX_balrp_t24' || INV_BILLINGCYCLEID || ' ON ' ||
+             GC_CU_BAL_CHECK || INV_BILLINGCYCLEID || '
+                           (ACCT_RES_ID) TABLESPACE IDX_RB';
+    EXECUTE IMMEDIATE V_SQL;
   
     PP_PRINTLOG(3,
                 'PP_INSERT_CHECK',
                 SQLCODE,
-                '更新cu_bal_check表中的余额类型');
+                '索引建立完成：' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID);
+  
+    -- 更新信用账本数据到本金账本
+    V_SQL := 'UPDATE /*+ rule */ ' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID ||
+             ' A SET A.PRE_CYCLE_BALANCE = nvl(A.PRE_CYCLE_BALANCE,0) +
+                             nvl((SELECT PRE_CYCLE_BALANCE
+                                FROM ' || GC_CU_BAL_CHECK ||
+             'tmp2_' || INV_BILLINGCYCLEID || ' B
+                               WHERE A.SUBS_ID = B.SUBS_ID
+                                 AND A.ACCT_RES_ID = B.ACCT_RES_ID),0)
+             ';
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '更新信用账本帐前余额' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID);
+  
+    V_SQL := 'UPDATE /*+ rule */ ' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID ||
+             ' A SET A.CUR_CYCLE_BAL = nvl(A.CUR_CYCLE_BAL,0) +
+                             nvl((SELECT CUR_CYCLE_BAL
+                                FROM ' || GC_CU_BAL_CHECK ||
+             'tmp2_' || INV_BILLINGCYCLEID || ' B
+                               WHERE A.SUBS_ID = B.SUBS_ID
+                                 AND A.ACCT_RES_ID = B.ACCT_RES_ID),0)
+             ';
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '更新信用账本帐后余额' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID);
+  
+    V_SQL := 'UPDATE /*+ rule */ ' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID ||
+             ' A SET A.DUE = nvl(A.DUE,0) +
+                             nvl((SELECT DUE
+                                FROM ' || GC_CU_BAL_CHECK ||
+             'tmp2_' || INV_BILLINGCYCLEID || ' B
+                               WHERE A.SUBS_ID = B.SUBS_ID
+                                 AND A.ACCT_RES_ID = B.ACCT_RES_ID),0)
+             ';
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '更新信用账本消费' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID);
+  
+    V_SQL := 'UPDATE /*+ rule */ ' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID ||
+             ' A SET A.CHARGE = nvl(A.CHARGE,0) +
+                             nvl((SELECT CHARGE
+                                FROM ' || GC_CU_BAL_CHECK ||
+             'tmp2_' || INV_BILLINGCYCLEID || ' B
+                               WHERE A.SUBS_ID = B.SUBS_ID
+                                 AND A.ACCT_RES_ID = B.ACCT_RES_ID),0)
+             ';
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+    PP_PRINTLOG(3,
+                'PP_INSERT_CHECK',
+                SQLCODE,
+                '更新信用账本帐充值' || GC_CU_BAL_CHECK || INV_BILLINGCYCLEID);
+  
   END;
 
   -------------------------------------------------------------------------------
   PROCEDURE PP_CLEAR_TMP_TAB(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE) IS
   BEGIN
-    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_USER_TAB_NAME);
+    -- PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_USER_TAB_NAME);
   
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CDR_TAB_NAME);
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CDR_TAB_NAME || 'TMP_');
@@ -1761,6 +2002,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'A_');
     PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_BAL_TAB_NAME || 'B_');
+  
+    -- PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CU_BAL_CHECK);
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CU_BAL_CHECK || 'TMP1_');
+    PP_DEL_TMP_TAB(INV_BILLINGCYCLEID, GC_CU_BAL_CHECK || 'TMP2_');
   END;
 
   -------------------------------------------------------------------------------
