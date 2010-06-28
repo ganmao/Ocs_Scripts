@@ -364,8 +364,8 @@ main()
             
             gvBalFile=`grep 'spool /' ${gvBalBackPath}/${_myOutSqlFile} | cut -c 11-`
             pLog 2 "main" "数据导出到文件：${gvBalFile}"
-        elif [[ ${gvProvince} = "HB" ]]; then
-            pLog 3 "main" "河北不支持此操作！"
+        elif [[ ${gvProvince} != "SD" ]]; then
+            pLog 3 "main" "不支持此操作！"
         fi
         
         ProcOraSql "@"${gvBalBackPath}/${_myOutSqlFile}
