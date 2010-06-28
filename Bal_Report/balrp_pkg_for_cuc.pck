@@ -9,13 +9,13 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- ==================================================
   -- 定义具体的使用地市
   -- 河北(HB)，山东(SD)，内蒙(NM)，甘肃(GS)
-  GC_PROVINCE CONSTANT CHAR(2) := 'HB';
+  GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '52';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
 
   -- 指定CPU并发数,危险参数！
-  GC_CPU_NUM CONSTANT NUMBER := 24;
+  GC_CPU_NUM CONSTANT NUMBER := 18;
 
   -- 定义中间层表在使用后是否删除(TRUE|FALSE)
   GC_TMP_TABLE_DEL CONSTANT BOOLEAN := FALSE;
@@ -1531,81 +1531,92 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '删除测试用户数据完成！');
     
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
-                TABLESPACE TAB_RB
-                NOLOGGING
-                AS
-                SELECT ' || INV_BILLINGCYCLEID ||
-               ' "帐务月份",
-                       A.AREA_ID "地市编码",
-                       NVL(ABS(SUM(B1.CHARGE_FEE)),0) "期初",
-                       NVL(ABS(SUM(A1.CHARGE_FEE)),0) "现金缴费",
-                       NVL(ABS(SUM(A2.CHARGE_FEE)),0) "开户预存款",
-                       NVL(ABS(SUM(A3.CHARGE_FEE)),0) "一卡充",
-                       NVL(ABS(SUM(A4.CHARGE_FEE)),0) "空中充值",
-                       NVL(ABS(SUM(C.CHARGE_FEE)),0) "本期减少",
-                       NVL(ABS(SUM(B2.CHARGE_FEE)),0) "月末余额",
-                       NVL(ABS(SUM(B3.CHARGE_FEE)),0) "月末余额（正）",
-                       NVL(ABS(SUM(B4.CHARGE_FEE)),0) "月末余额（负）",
-                       NVL((ABS(SUM(B2.CHARGE_FEE)) - ABS(SUM(B3.CHARGE_FEE)) +
-                       ABS(SUM(B4.CHARGE_FEE))),0) "校验"
-                  FROM AREA@LINK_CC A,
-                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 200
-                            OR SERVICE_TYPE = 203
-                         GROUP BY AREA_ID) A1,
-                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 202
-                         GROUP BY AREA_ID) A2,
-                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 201
-                         GROUP BY AREA_ID) A3,
-                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-                          FROM ' || GC_ACCTBOOK_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         WHERE SERVICE_TYPE = 204
-                         GROUP BY AREA_ID) A4,
-                       (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-                          FROM ' || GC_CDR_TAB_NAME ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY AREA_ID) C,
-                       (SELECT AREA_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'A_' ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY AREA_ID) B1,
-                       (SELECT AREA_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || '
-                         GROUP BY AREA_ID) B2,
-                       (SELECT AREA_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || '
-                         WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) < 0
-                         GROUP BY AREA_ID) B3,
-                       (SELECT AREA_ID,
-                               SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
-                          FROM ' || GC_BAL_TAB_NAME || 'B_' ||
-               INV_BILLINGCYCLEID || '
-                         WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) > 0
-                         GROUP BY AREA_ID) B4
-                 WHERE A.AREA_ID = B1.AREA_ID(+)
-                   AND A.AREA_ID = B2.AREA_ID(+)
-                   AND A.AREA_ID = C.AREA_ID(+)
-                   AND A.AREA_ID = A1.AREA_ID(+)
-                   AND A.AREA_ID = A2.AREA_ID(+)
-                   AND A.AREA_ID = A3.AREA_ID(+)
-                   AND A.AREA_ID = A4.AREA_ID(+)
-                   AND A.AREA_ID = B3.AREA_ID(+)
-                   AND A.AREA_ID = B4.AREA_ID(+)
-                 GROUP BY A.AREA_ID
+  TABLESPACE TAB_RB
+  NOLOGGING
+  AS
+  SELECT ' || INV_BILLINGCYCLEID ||
+ ' "帐务月份",
+         A.AREA_ID "地市编码",
+         NVL(ABS(SUM(B1.CHARGE_FEE)),0)*(0.01) "期初",
+         NVL(ABS(SUM(A1.CHARGE_FEE)),0)*(0.01) "现金缴费",
+         NVL(ABS(SUM(A2.CHARGE_FEE)),0)*(0.01) "开户预存款",
+         NVL(ABS(SUM(A3.CHARGE_FEE)),0)*(0.01) "一卡充",
+         NVL(ABS(SUM(A4.CHARGE_FEE)),0)*(0.01) "空中充值",
+         NVL(ABS(SUM(C.CHARGE_FEE)),0)*(0.01) "本期减少",
+         (NVL(ABS(SUM(B1.CHARGE_FEE)),0)
+          + NVL(ABS(SUM(A1.CHARGE_FEE)),0)
+          + NVL(ABS(SUM(A2.CHARGE_FEE)),0)
+          + NVL(ABS(SUM(A3.CHARGE_FEE)),0)
+          + NVL(ABS(SUM(A4.CHARGE_FEE)),0)
+          - NVL(ABS(SUM(C.CHARGE_FEE)),0))*(0.01) "月末余额",
+         NVL(ABS(SUM(B3.CHARGE_FEE)),0)*(0.01) "月末余额（正）",
+         NVL(ABS(SUM(B4.CHARGE_FEE)),0)*(0.01) "月末余额（负）",
+         NVL((ABS((NVL(ABS(SUM(B1.CHARGE_FEE)),0)
+                  + NVL(ABS(SUM(A1.CHARGE_FEE)),0)
+                  + NVL(ABS(SUM(A2.CHARGE_FEE)),0)
+                  + NVL(ABS(SUM(A3.CHARGE_FEE)),0)
+                  + NVL(ABS(SUM(A4.CHARGE_FEE)),0)
+                  - NVL(ABS(SUM(C.CHARGE_FEE)),0)))
+             - ABS(SUM(B3.CHARGE_FEE))
+             + ABS(SUM(B4.CHARGE_FEE))),0)*(0.01) "校验"
+    FROM AREA@LINK_CC A,
+         (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+            FROM ' || GC_ACCTBOOK_TAB_NAME ||
+ INV_BILLINGCYCLEID || '
+           WHERE SERVICE_TYPE = 200
+              OR SERVICE_TYPE = 203
+           GROUP BY AREA_ID) A1,
+         (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+            FROM ' || GC_ACCTBOOK_TAB_NAME ||
+ INV_BILLINGCYCLEID || '
+           WHERE SERVICE_TYPE = 202
+           GROUP BY AREA_ID) A2,
+         (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+            FROM ' || GC_ACCTBOOK_TAB_NAME ||
+ INV_BILLINGCYCLEID || '
+           WHERE SERVICE_TYPE = 201
+           GROUP BY AREA_ID) A3,
+         (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+            FROM ' || GC_ACCTBOOK_TAB_NAME ||
+ INV_BILLINGCYCLEID || '
+           WHERE SERVICE_TYPE = 204
+           GROUP BY AREA_ID) A4,
+         (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
+            FROM ' || GC_CDR_TAB_NAME ||
+ INV_BILLINGCYCLEID || '
+           GROUP BY AREA_ID) C,
+         (SELECT AREA_ID,
+                 SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+            FROM ' || GC_BAL_TAB_NAME || 'A_' ||
+ INV_BILLINGCYCLEID || '
+           GROUP BY AREA_ID) B1,
+         (SELECT AREA_ID,
+                 SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+            FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+ INV_BILLINGCYCLEID || '
+           GROUP BY AREA_ID) B2,
+         (SELECT AREA_ID,
+                 SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+            FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+ INV_BILLINGCYCLEID || '
+           WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) < 0
+           GROUP BY AREA_ID) B3,
+         (SELECT AREA_ID,
+                 SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
+            FROM ' || GC_BAL_TAB_NAME || 'B_' ||
+ INV_BILLINGCYCLEID || '
+           WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) > 0
+           GROUP BY AREA_ID) B4
+   WHERE A.AREA_ID = B1.AREA_ID(+)
+     AND A.AREA_ID = B2.AREA_ID(+)
+     AND A.AREA_ID = C.AREA_ID(+)
+     AND A.AREA_ID = A1.AREA_ID(+)
+     AND A.AREA_ID = A2.AREA_ID(+)
+     AND A.AREA_ID = A3.AREA_ID(+)
+     AND A.AREA_ID = A4.AREA_ID(+)
+     AND A.AREA_ID = B3.AREA_ID(+)
+     AND A.AREA_ID = B4.AREA_ID(+)
+   GROUP BY A.AREA_ID
                 ';
     
     ELSIF GC_PROVINCE = 'HB' THEN
