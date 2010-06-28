@@ -7,8 +7,8 @@
 
 #内存数据库配置
 #-----------------------------------------------------
-gvMdbType="TT"      #TT/AB
-gvMdbDsn="ocs"
+gvMdbType="AB"      #TT/AB
+gvMdbDsn="127.0.0.1"
 gvMdbUser="ocs"
 gvMdbPasswd="ocs"
 
@@ -23,11 +23,11 @@ gvOraPasswd="smart"
 
 #内存库BAL表数据导出文件夹
 #-----------------------------------------------------
-gvBalBackPath="/ztesoft/ocs/scripts/report/bal_bak"
+gvBalBackPath="/ztesoft/ocsr11/scripts/report/bal_bak"
 
 #余额报表输出目录
 #-----------------------------------------------------
-gvOutReportPath="/ztesoft/ocs/scripts/report/rep_out"
+gvOutReportPath="/ztesoft/ocsr11/scripts/report/rep_out"
 
 #=====================================================
 #全局变量
@@ -103,15 +103,19 @@ ExpBalData()
     elif [[ ${_MdbType} = "AB" ]]; then
         pLog 1 "ExpBalData" "开始从AB数据库导出BAL表信息。。。"
         
-        ##生成导出Alibase余额表BAL的格式文件
-        #iloader formout -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -T ${gvMdbUser}.bal -f ${_BalBackPath}/bal.fmt
-        #sed 's/YYYY\/MM\/DD HH:MI:SS/YYYYMMDDHHMISS/g' ${_BalBackPath}/bal.fmt > ${_BalBackPath}/${gvMdbUser}.fmt
-        #rm ${_BalBackPath}/bal.fmt
-        #
-        ##从Altibase中导出余额表BAL,以便之后处理和备份
-        #iloader out -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -f ${gvMdbUser}.fmt -T ${gvMdbUser}.bal -d ${_BalBackPath}/${gvBalFile}.out -t ','
+        #生成导出Alibase余额表BAL的格式文件
+        echo "iloader formout -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -T ${gvMdbUser}.bal -f ${_BalBackPath}/${gvBalFile}.f"
+        iloader formout -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -T ${gvMdbUser}.bal -f ${_BalBackPath}/${gvBalFile}.f
+        sed 's/YYYY\/MM\/DD HH:MI:SS/YYYYMMDDHHMISS/' ${_BalBackPath}/${gvBalFile}.f > ${_BalBackPath}/${gvBalFile}.fmt
+        rm ${_BalBackPath}/${gvBalFile}.f
         
-        pLog 3 "ExpBalData" "导出BAL表数据:${_BalBackPath}/${gvBalFile}.out"
+        #从Altibase中导出余额表BAL,以便之后处理和备份
+        echo "iloader out -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -f ${_BalBackPath}/${gvBalFile}.fmt -t ',' -T ${gvMdbUser}.bal -d ${_BalBackPath}/${gvBalFile}"
+        iloader out -u ${gvMdbUser} -p ${gvMdbPasswd} -s ${gvMdbDsn} -f ${_BalBackPath}/${gvBalFile}.fmt -t ',' -T ${gvMdbUser}.bal -d ${_BalBackPath}/${gvBalFile}.out
+        #sed 's/null//g' ${_BalBackPath}/${gvBalFile} > ${_BalBackPath}/${gvBalFile}.out
+        #rm ${_BalBackPath}/${gvBalFile}
+        
+        pLog 3 "ExpBalData" "导出BAL表数据:${_BalBackPath}/${gvBalFile}.out|${_BackBalInfo}"
     fi
 }
 
