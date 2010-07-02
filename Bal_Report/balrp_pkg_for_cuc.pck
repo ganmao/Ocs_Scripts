@@ -12,7 +12,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1,16,17,23,25,26,27,28,30,31';
+  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1, 16, 17, 23, 25, 26, 27, 28, 30, 31, 41, 116, 156, 172';
 
   -- 指定CPU并发数,危险参数！
   GC_CPU_NUM CONSTANT NUMBER := 18;
@@ -109,7 +109,8 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
 
   -- 采集话单，归类，创建索引
   PROCEDURE PP_COLLECT_CDR(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
-                           INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE);
+                           INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE,
+                           INV_AFTBALTAB      USER_TABLES.TABLE_NAME%TYPE);
 
   -- 采集用户本月ACCT_BOOK表信息
   PROCEDURE PP_COLLECT_ACCTBOOK(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
@@ -199,10 +200,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       PP_COLLECT_USERINFO(V_BILLINGCYCLEID, GC_USER_TAB_NAME);
       PP_PRINTLOG(3, 'PP_MAIN', 0, '采集用户信息完成！');
     
-      -- 采集用户语音话单
+      -- 采集用户话单
       PP_PRINTLOG(3, 'PP_MAIN', 0, '开始采集CDR信息...');
       PP_DEL_TMP_TAB(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
-      PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME);
+      PP_COLLECT_CDR(V_BILLINGCYCLEID, GC_CDR_TAB_NAME, INV_AFTBALTAB);
       PP_PRINTLOG(3, 'PP_MAIN', 0, '采集CDR信息完成！');
     
       -- 采集用户缴费信息
@@ -464,7 +465,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
 
   -------------------------------------------------------------------------------
   PROCEDURE PP_COLLECT_CDR(INV_BILLINGCYCLEID BILLING_CYCLE.BILLING_CYCLE_ID@LINK_CC%TYPE,
-                           INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE) IS
+                           INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE,
+                           INV_AFTBALTAB      USER_TABLES.TABLE_NAME%TYPE) IS
     V_SQL       VARCHAR2(4000);
     V_TMP_TABLE USER_TABLES.TABLE_NAME%TYPE := INV_TABLENAME || 'tmp_';
   BEGIN
@@ -916,13 +918,14 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   
     ------------------数据合并----------------------
     -- 将采集的各个数据进行再次合并后放入正式CDR表
-    V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+    IF GC_PROVINCE = 'SD' THEN
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
               AS
               SELECT /*+ PARALLEL(' || V_TMP_TABLE ||
-             INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
-             ') */   A.SUBS_ID,
+               INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+               ') */   A.SUBS_ID,
                      C.AREA_ID,
                      A.SERVICE_TYPE,
                      A.RE_ID,
@@ -933,15 +936,42 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      SUM(A.CHARGE_FEE) "CHARGE_FEE"
                 FROM ' || V_TMP_TABLE || INV_BILLINGCYCLEID || ' A,
                      ' || GC_USER_TAB_NAME ||
-             INV_BILLINGCYCLEID || ' C,
+               INV_BILLINGCYCLEID || ' C,
+                     ' || INV_AFTBALTAB || ' B
+               WHERE A.Bal_Id(+) = B.Bal_Id
+                 AND b.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+                 AND A.SUBS_ID = C.SUBS_ID
+               GROUP BY C.AREA_ID, A.SUBS_ID, A.SERVICE_TYPE, A.RE_ID, A.ACCT_ID, A.BAL_ID
+               ';
+    ELSE
+      V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
+              TABLESPACE TAB_RB
+              NOLOGGING
+              AS
+              SELECT /*+ PARALLEL(' || V_TMP_TABLE ||
+               INV_BILLINGCYCLEID || ', ' || GC_CPU_NUM ||
+               ') */   A.SUBS_ID,
+                     C.AREA_ID,
+                     A.SERVICE_TYPE,
+                     A.RE_ID,
+                     A.ACCT_ID "ACCT_ID",
+                     A.BAL_ID "BAL_ID",
+                     SUM(A.DURATION) "DURATION",
+                     SUM(A.DATA_BYTE) "DATA_BYTE",
+                     SUM(A.CHARGE_FEE) "CHARGE_FEE"
+                FROM ' || V_TMP_TABLE || INV_BILLINGCYCLEID || ' A,
+                     ' || GC_USER_TAB_NAME ||
+               INV_BILLINGCYCLEID || ' C,
                      (SELECT DISTINCT CU_AIT_ID
                         FROM ACCT_ITEM_TYPE@LINK_CC
                        WHERE ACCT_RES_ID IN (' || GC_RES_TYPE ||
-             ')) B
+               ')) B
                WHERE A.ACCT_ITEM_TYPE_ID IN B.CU_AIT_ID
                  AND A.SUBS_ID = C.SUBS_ID
                GROUP BY C.AREA_ID, A.SUBS_ID, A.SERVICE_TYPE, A.RE_ID, A.ACCT_ID, A.BAL_ID
                ';
+    END IF;
+  
     EXECUTE IMMEDIATE V_SQL;
     PP_PRINTLOG(3,
                 'PP_COLLECT_CDR',
@@ -1346,11 +1376,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                        SUM(B.GROSS_BAL) "GROSS_BAL",
                        SUM(B.RESERVE_BAL) "RESERVE_BAL",
                        SUM(B.CONSUME_BAL) "CONSUME_BAL"
-                  FROM ' || INV_TBAL_A ||
-               ' B, SUBS_ACCT@LINK_CC SA, ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' U
+                  FROM ' || INV_TBAL_A || ' B, ' ||
+               GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-                   AND B.ACCT_ID = SA.ACCT_ID(+)
+                   AND (B.ACCT_ID = U.ACCT_ID(+) OR B.ACCT_ID = U.CREDIT_ACCT(+))
                    AND SA.SUBS_ID = U.SUBS_ID
                  GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
                 ';
@@ -1406,11 +1435,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                        SUM(B.GROSS_BAL) "GROSS_BAL",
                        SUM(B.RESERVE_BAL) "RESERVE_BAL",
                        SUM(B.CONSUME_BAL) "CONSUME_BAL"
-                  FROM ' || INV_TBAL_B ||
-               ' B, SUBS_ACCT@LINK_CC SA, ' || GC_USER_TAB_NAME ||
-               INV_BILLINGCYCLEID || ' U
+                  FROM ' || INV_TBAL_B || ' B, ' ||
+               GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-                   AND B.ACCT_ID = SA.ACCT_ID(+)
+                   AND (B.ACCT_ID = U.ACCT_ID(+) OR B.ACCT_ID = U.CREDIT_ACCT(+))
                    AND SA.SUBS_ID = U.SUBS_ID
                  GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
                 ';
@@ -1534,8 +1562,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
   TABLESPACE TAB_RB
   NOLOGGING
   AS
-  SELECT ' || INV_BILLINGCYCLEID ||
- ' "帐务月份",
+  SELECT ' || INV_BILLINGCYCLEID || ' "帐务月份",
          A.AREA_ID "地市编码",
          NVL(ABS(SUM(B1.CHARGE_FEE)),0)*(0.01) "期初",
          NVL(ABS(SUM(A1.CHARGE_FEE)),0)*(0.01) "现金缴费",
@@ -1562,49 +1589,48 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     FROM AREA@LINK_CC A,
          (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
             FROM ' || GC_ACCTBOOK_TAB_NAME ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE SERVICE_TYPE = 200
               OR SERVICE_TYPE = 203
            GROUP BY AREA_ID) A1,
          (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
             FROM ' || GC_ACCTBOOK_TAB_NAME ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE SERVICE_TYPE = 202
            GROUP BY AREA_ID) A2,
          (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
             FROM ' || GC_ACCTBOOK_TAB_NAME ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE SERVICE_TYPE = 201
            GROUP BY AREA_ID) A3,
          (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
             FROM ' || GC_ACCTBOOK_TAB_NAME ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE SERVICE_TYPE = 204
            GROUP BY AREA_ID) A4,
          (SELECT AREA_ID, SUM(CHARGE_FEE) "CHARGE_FEE"
-            FROM ' || GC_CDR_TAB_NAME ||
- INV_BILLINGCYCLEID || '
+            FROM ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID || '
            GROUP BY AREA_ID) C,
          (SELECT AREA_ID,
                  SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
             FROM ' || GC_BAL_TAB_NAME || 'A_' ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            GROUP BY AREA_ID) B1,
          (SELECT AREA_ID,
                  SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
             FROM ' || GC_BAL_TAB_NAME || 'B_' ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            GROUP BY AREA_ID) B2,
          (SELECT AREA_ID,
                  SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
             FROM ' || GC_BAL_TAB_NAME || 'B_' ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) < 0
            GROUP BY AREA_ID) B3,
          (SELECT AREA_ID,
                  SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) "CHARGE_FEE"
             FROM ' || GC_BAL_TAB_NAME || 'B_' ||
- INV_BILLINGCYCLEID || '
+               INV_BILLINGCYCLEID || '
            WHERE (GROSS_BAL + RESERVE_BAL + CONSUME_BAL) > 0
            GROUP BY AREA_ID) B4
    WHERE A.AREA_ID = B1.AREA_ID(+)

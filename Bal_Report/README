@@ -89,7 +89,7 @@ t.contact_channel_id=1 AND acct_book_type='P' and t.party_code is not null and t
 2010-06-11 12:28:09
 ----------------------------------------
 开始测试山东的第一个版本
---山东需要统计的余额类型 acct_res_id 1,16,17,23,25,26,27,28,30,31
+--山东需要统计的余额类型 acct_res_id 1, 16, 17, 23, 25, 26, 27, 28, 30, 31, 41, 116, 156, 172
 export LANG=zh_CN.utf8
 
 mytt=ttisql "uid=ocs;pwd=ocs;dsn=ocs"

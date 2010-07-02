@@ -189,7 +189,7 @@ WriteCreateSql()
     PRIORITY           NUMBER(9),
     LAST_BAL           NUMBER(12),
     LAST_RECHARGE      NUMBER(12),
-    BAL_CODE           NUMBER(12)
+    BAL_CODE           NUMBER(20)
 ) tablespace TAB_RB;
 " > ${_FilePath}/${_SqlFileName}
 
