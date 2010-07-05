@@ -1657,7 +1657,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                        ABS(NVL(A.CHARGE_FEE, 0)) "月中充值",
                        ABS(NVL(C.CHARGE_FEE, 0)) "月中消费",
                        ABS(NVL(BB.CHARGE_FEE, 0)) "月末余额",
-                       ABS(BA.CHARGE_FEE) + ABS(NVL(A.CHARGE_FEE, 0)) -
+                       ABS(NVL(BA.CHARGE_FEE), 0) + ABS(NVL(A.CHARGE_FEE, 0)) -
                        ABS(NVL(C.CHARGE_FEE, 0)) "月末自平衡余额"  
                   FROM (SELECT BAL_ID,
                                SUM(GROSS_BAL + RESERVE_BAL + CONSUME_BAL) AS "CHARGE_FEE"
