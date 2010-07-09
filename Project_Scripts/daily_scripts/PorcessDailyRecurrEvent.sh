@@ -16,6 +16,10 @@ cd ${HOME}/bin
 #==========================================
 #日志文件名称
 v_LogFileName="PorcessDailyRecurrEvent_${gvDate_Today}.log"
+
+#周期费算费进程数
+v_ProcModNum=10
+
 #日志等级,内容....
 v_LogLevel="1"
 v_LogContent="开始执行日租收取程序..."
@@ -131,7 +135,27 @@ v_LogContent="运行日租事件生成进程结束!开始运行手日租批价进程..."
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
 
 #运行日租批价进程
-${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -l 0
+#${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -l 0
+
+#改为多进程处理
+v_count=0
+while [[ ${v_count} -lt ${v_ProcModNum} ]]
+do
+    echo "nohup ${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -M ${v_ProcModNum} -i ${v_count} &"
+    v_count=`expr ${v_count} + 1`
+    #echo "v_count="${v_count}
+done
+
+v_ProcEnd="NO"
+while [[ ${v_ProcEnd} = "YES" ]]
+do
+    _Num=`ps -ef RecurrEventRate | grep -v grep | wc -l`
+    if [[ ${_Num} -eq 0 ]]
+    then
+        v_ProcEnd="YES"
+    fi
+done
+
 v_LogLevel="1"
 v_LogContent="运行日租批价进程结束!"
 gfWriteLogFile ${v_LogFileName} ${v_LogLevel} ${v_LogContent}
