@@ -1031,9 +1031,10 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      AB.CONTACT_CHANNEL_ID,
                      AB.PARTY_CODE,
                      SUM(AB.CHARGE) "CHARGE_FEE"
-                FROM ACCT_BOOK@LINK_CC AB, SUBS_ACCT@LINK_CC SA
+                FROM ACCT_BOOK@LINK_CC AB, ' ||
+             GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' SA
                WHERE ACCT_BOOK_TYPE IN (''H'', ''P'', ''Q'', ''V'')
-                 AND AB.ACCT_ID = SA.ACCT_ID
+                 AND (AB.ACCT_ID = SA.ACCT_ID OR AB.ACCT_ID = SA.CREDIT_ACCT)
                  AND AB.CREATED_DATE >= to_date(' ||
              V_BEGIN_DATE ||
              ', ''yyyymmddhh24miss'')
@@ -1093,43 +1094,6 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '本帐期临时ACCT_BOOK表索引建立完毕！' || V_TMP_ACCTOOK ||
                 INV_BILLINGCYCLEID);
     COMMIT;
-  
-    /*-- 统计用户一次性费 SERVICE_TYPE = 102
-    V_SQL := 'delete from ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID ||
-             ' where SERVICE_TYPE = 102';
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '删除表中一次性费数据完成！' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID);
-    EXECUTE IMMEDIATE V_SQL;
-    COMMIT;
-    
-    V_SQL := 'insert \*+ APPEND *\ into ' || GC_CDR_TAB_NAME ||
-             INV_BILLINGCYCLEID || '
-                  SELECT A.SUBS_ID,
-                         U.AREA_ID,
-                         102 "SERVICE_TYPE",
-                         '''' "RE_ID",
-                         A.ACCT_ID "ACCT_ID",
-                         A.BAL_ID "BAL_ID",
-                         0 "DURATION",
-                         0 "DATA_BYTE",
-                         SUM(A.CHARGE_FEE) "CHARGE_FEE"
-                    FROM ' || V_TMP_ACCTOOK ||
-             INV_BILLINGCYCLEID || ' A,
-             ' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
-                   WHERE (A.ACCT_BOOK_TYPE = ''Q''
-                      OR (A.ACCT_BOOK_TYPE = ''V'' AND A.CHARGE_FEE > 0))
-                     AND A.SUBS_ID = U.SUBS_ID
-                     AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-                   GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID
-               ';
-    EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '本帐期一次性费费用插入完毕！' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID);
-    COMMIT;*/
   
     -- 创建用户缴费信息统计表
     -- 统计用户 现金缴费 SERVICE_TYPE = 200
@@ -1370,7 +1334,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 TABLESPACE TAB_RB
                 NOLOGGING
                 AS
-                SELECT SA.SUBS_ID,
+                SELECT U.SUBS_ID,
                        U.AREA_ID,
                        B.ACCT_ID,
                        SUM(B.GROSS_BAL) "GROSS_BAL",
@@ -1379,9 +1343,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   FROM ' || INV_TBAL_A || ' B, ' ||
                GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-                   AND (B.ACCT_ID = U.ACCT_ID(+) OR B.ACCT_ID = U.CREDIT_ACCT(+))
-                   AND SA.SUBS_ID = U.SUBS_ID
-                 GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
+                   AND (B.ACCT_ID = U.ACCT_ID OR B.ACCT_ID = U.CREDIT_ACCT)
+                 GROUP BY B.ACCT_ID, U.SUBS_ID, U.AREA_ID
                 ';
       EXECUTE IMMEDIATE V_SQL;
       PP_PRINTLOG(3,
@@ -1429,7 +1392,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 TABLESPACE TAB_RB
                 NOLOGGING
                 AS
-                SELECT SA.SUBS_ID,
+                SELECT U.SUBS_ID,
                        U.AREA_ID,
                        B.ACCT_ID,
                        SUM(B.GROSS_BAL) "GROSS_BAL",
@@ -1438,9 +1401,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   FROM ' || INV_TBAL_B || ' B, ' ||
                GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                  WHERE B.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
-                   AND (B.ACCT_ID = U.ACCT_ID(+) OR B.ACCT_ID = U.CREDIT_ACCT(+))
-                   AND SA.SUBS_ID = U.SUBS_ID
-                 GROUP BY B.ACCT_ID, SA.SUBS_ID, U.AREA_ID
+                   AND (B.ACCT_ID = U.ACCT_ID OR B.ACCT_ID = U.CREDIT_ACCT)
+                 GROUP BY B.ACCT_ID, U.SUBS_ID, U.AREA_ID
                 ';
       EXECUTE IMMEDIATE V_SQL;
       PP_PRINTLOG(3,
@@ -1577,7 +1539,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
           + NVL(ABS(SUM(A4.CHARGE_FEE)),0)
           - NVL(ABS(SUM(C.CHARGE_FEE)),0))*(0.01) "月末余额",
          NVL(ABS(SUM(B3.CHARGE_FEE)),0)*(0.01) "月末余额（正）",
-         NVL(ABS(SUM(B4.CHARGE_FEE)),0)*(0.01) "月末余额（负）",
+         NVL(SUM(B4.CHARGE_FEE),0)*(-0.01) "月末余额（负）",
          NVL((ABS((NVL(ABS(SUM(B1.CHARGE_FEE)),0)
                   + NVL(ABS(SUM(A1.CHARGE_FEE)),0)
                   + NVL(ABS(SUM(A2.CHARGE_FEE)),0)
