@@ -425,6 +425,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                  AND S.SUBS_ID = SA.SUBS_ID
                  AND SA.ACCT_ID = A.ACCT_ID
                  AND SA.STATE = ''A''
+                 AND P.STATE != ''B''
                  AND SA.PRIORITY = ''999999999''
                  AND SA.CU_AIT_ID = (SELECT CURRENT_VALUE
                                        FROM SYSTEM_PARAM@link_cc T
@@ -1087,11 +1088,24 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
              V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
                            (BAL_ID) TABLESPACE IDX_RB';
     EXECUTE IMMEDIATE V_SQL;
-  
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
                 '本帐期临时ACCT_BOOK表索引建立完毕！' || V_TMP_ACCTOOK ||
+                INV_BILLINGCYCLEID);
+    COMMIT;
+    
+    -- 将ACCT_BOOK临时表中，充值抵扣信用账本的记录，充值渠道更新为1
+    V_SQL := 'UPDATE ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || ' A
+                 SET A.CONTACT_CHANNEL_ID = 1
+               WHERE A.CONTACT_CHANNEL_ID IS NULL
+                 AND A.ACCT_BOOK_TYPE = ''V''
+                 AND A.CHARGE_FEE < 0';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '更新V充值记录的渠道信息完毕!' || V_TMP_ACCTOOK ||
                 INV_BILLINGCYCLEID);
     COMMIT;
   

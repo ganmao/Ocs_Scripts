@@ -142,6 +142,7 @@ v_count=0
 while [[ ${v_count} -lt ${v_ProcModNum} ]]
 do
     echo "nohup ${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -M ${v_ProcModNum} -i ${v_count} &"
+    nohup ${HOME}/bin/RecurrEventRate -e 3 -c ${v_CurrCycleId} -M ${v_ProcModNum} -i ${v_count} &
     v_count=`expr ${v_count} + 1`
     #echo "v_count="${v_count}
 done

@@ -1,3 +1,63 @@
+2010-07-09 16:25:52
+----------------------------------------
+修改充值记录获取方式
+CREATE TABLE balrp_acct_zdl TABLESPACE TAB_RB AS
+SELECT AB.ACCT_BOOK_ID,
+       U.SUBS_ID,
+       AB.ACCT_ID,
+       AB.BAL_ID,
+       AB.ACCT_RES_ID,
+       AB.ACCT_BOOK_TYPE,
+       AB.CREATED_DATE,
+       AB.CONTACT_CHANNEL_ID,
+       AB.PARTY_CODE,
+       P.SUBMIT_AMOUNT "PAYMENT_CHARGE",
+       AB.CHARGE
+  FROM ACCT_BOOK@link_cc              AB,
+       PAYMENT@link_cc                P,
+       OVERDRAFT_WRITEOFF@link_cc     OW,
+       BALRP_USER_109                 U
+ WHERE AB.ACCT_BOOK_ID = OW.ACCT_BOOK_ID
+   AND P.PAYMENT_ID = OW.ACCT_BOOK_ID
+   AND AB.ACCT_ID = U.ACCT_ID
+   AND AB.ACCT_BOOK_ID = 809226;
+
+SELECT * FROM balrp_acct_zdl;
+
+INSERT INTO balrp_acct_zdl 
+SELECT AB.ACCT_BOOK_ID,
+       U.SUBS_ID,
+       AB.ACCT_ID,
+       AB.BAL_ID,
+       AB.ACCT_RES_ID,
+       --AB.ACCT_BOOK_TYPE,
+       'V' "ACCT_BOOK_TYPE",
+       AB.CREATED_DATE,
+       AB.CONTACT_CHANNEL_ID,
+       AB.PARTY_CODE,
+       0 "PAYMENT_CHARGE",
+       AB.CHARGE
+  FROM ACCT_BOOK@link_cc              AB,
+       PAYMENT@link_cc                P,
+       OVERDRAFT_WRITEOFF@link_cc     OW,
+       BALRP_USER_109                 U
+ WHERE AB.ACCT_BOOK_ID = OW.RELA_ACCT_BOOK_ID
+   AND P.PAYMENT_ID = OW.ACCT_BOOK_ID
+   AND AB.ACCT_ID = U.CREDIT_ACCT
+   AND P.PAYMENT_ID = 809226;
+
+SELECT * FROM BALRP_ACCTBOOK_TMP_109@LINK_RB;
+
+SELECT * FROM BALRP_ACCT_ZDL WHERE ACCT_BOOK_TYPE = 'V';
+
+UPDATE BALRP_ACCT_ZDL A
+   SET A.CONTACT_CHANNEL_ID = (SELECT CONTACT_CHANNEL_ID
+                                 FROM ACCT_BOOK@LINK_CC          AB,
+                                      OVERDRAFT_WRITEOFF@LINK_CC OW
+                                WHERE AB.ACCT_BOOK_ID = OW.ACCT_BOOK_ID
+                                  AND OW.RELA_ACCT_BOOK_ID = A.ACCT_BOOK_ID)
+ WHERE A.ACCT_BOOK_TYPE = 'V';
+
 2010-06-23 16:47:47
 ----------------------------------------
 与王伟讨论的需求：
