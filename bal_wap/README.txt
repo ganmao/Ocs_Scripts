@@ -114,3 +114,5 @@ Type "help", "copyright", "credits" or "license" for more information.
 BAL_WAP.py -- 主程序
 bal_wap.ini -- 通用配置
 bal_wap_sql.ini -- sql配置
+
+11，采用 create_table.sql 中的脚本在RB库中建立相应同步信息表
