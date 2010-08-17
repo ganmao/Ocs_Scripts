@@ -1,0 +1,14 @@
+#!/bin/ksh
+JAVA_HOME=/opt/java1.5/jre
+JYTHON_HOME=/ztesoft/ocsr11/scripts/jython
+CLASSPATH=/ztesoft/ocsr11/scripts/jython/jython.jar
+CP=/tt/TimesTen/tt70/lib/ttjdbc5.jar:/oracle/product/102/jdbc/lib/ojdbc14_g.jar:/ztesoft/altibase/altibase_home/lib/Altibase.jar
+JAVA_OPTS="-d64 -Xmx512m -Xss1024k"
+
+if [[ ! -z "$CLASSPATH" ]]
+then
+  CP=$CLASSPATH:$CP
+fi
+
+${JAVA_HOME}/bin/java ${JAVA_OPTS} -classpath ${CP} -Dpython.home=${JYTHON_HOME} -Dpython.executable=jython org.python.util.jython $@
+
