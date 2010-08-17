@@ -56,7 +56,8 @@ Congratulations! You successfully installed Jython 2.5.1 to directory /ztesoft/o
 5，替换原有执行脚本
 scripts >cd jython
 scripts/jython >mv jython jython_bash
-    将附件中提供的jython文件放入目录下
+将附件中提供的jython文件放入目录下
+scripts/jython >chmod 755 jython
     
 6，修改jython文件中的环境变量
 JAVA_HOME，JYTHON_HOME，CLASSPATH 都需要根据实际情况修改
@@ -65,3 +66,51 @@ CP需要根据现场情况，
     DB库要找到对应的Altibase.jar
 
 7，同步脚本放入scripts目录，根据需要修改ini的配置文件
+
+8，首次使用请将bal_wap_sql.ini文件中的DEFAULT=>update_date修改为一个较早前时间，以便将数据初始化入oracle
+
+9，运行，检查一下配置是否存在问题
+scripts/jython >jython
+*sys-package-mgr*: processing new jar, '/ztesoft/ocsr11/scripts/jython/jython.jar'
+*sys-package-mgr*: processing new jar, '/oracle/product/102/jdbc/lib/ojdbc14_g.jar'
+*sys-package-mgr*: processing new jar, '/ztesoft/altibase/altibase_home/lib/Altibase.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/vm.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/core.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/charsets.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/graphics.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/security.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmpkcs.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmorb.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmcfw.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmorbapi.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmjcefw.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmjgssprovider.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmjsseprovider2.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmjaaslm.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ibmcertpathprovider.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/server.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/xml.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/CmpCrmf.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/IBMKeyManagementServer.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/dtfj-interface.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/dtfj.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/gskikm.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/indicim.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmcmsprovider.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmsaslprovider.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmjcefips.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmjceprovider.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmkeycert.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmpkcs11.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/ibmpkcs11impl.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/jaccess.jar'
+*sys-package-mgr*: processing new jar, '/usr/java5/jre/lib/ext/jdmpview.jar'
+Jython 2.5.1 (Release_2_5_1:6813, Sep 26 2009, 13:47:54) 
+[IBM J9 VM (IBM Corporation)] on java1.5.0
+Type "help", "copyright", "credits" or "license" for more information.
+>>>
+
+10，上传脚本
+BAL_WAP.py -- 主程序
+bal_wap.ini -- 通用配置
+bal_wap_sql.ini -- sql配置

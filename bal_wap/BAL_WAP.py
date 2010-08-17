@@ -201,7 +201,7 @@ class DB_JDBC(object):
             self.pStmt.addBatch()
             
             if (_dNumber % self.fetchSize == 0):
-                myLog.info(u'达到提交批次[%d],提交数据！' % _dNumber)
+                myLog.info(u'已删除数据[%d]条！' % _dNumber)
                 self.pStmt.executeBatch()
                 self.con.commit()
         
@@ -249,7 +249,7 @@ class DB_JDBC(object):
             self.pStmt.addBatch()
             
             if ( _inumber % self.fetchSize == 0):
-                myLog.info(u'达到提交批次[%d],提交数据！' % _inumber)
+                myLog.info(u'已插入数据[%d]条！' % _inumber)
                 self.pStmt.executeBatch()
                 self.con.commit()
         
@@ -279,6 +279,39 @@ class JDBC_TimesTen(DB_JDBC):
         DriverManager.setLoginTimeout(5)
         self.con = DriverManager.getConnection("jdbc:timesten:direct:dsn=%s;uid=%s;pwd=%s;"
                                         % (ttIn_dsn, ttIn_uid, ttIn_pwd))
+        
+        #取消自动commit
+        self.con.setAutoCommit(False)
+        
+        #创建链接声明
+        self.stmt = self.con.createStatement()
+        
+        #设置查询超时时间
+        self.stmt.setQueryTimeout(10)
+        
+    def __del__(self):
+        DB_JDBC.__del__(self)
+        
+class JDBC_Altibase(DB_JDBC):
+    '''Altibase的JDBC类'''
+    def __init__(self,abIn_ip, abIn_port, abIn_dsn, abIn_uid, abIn_pwd, abIn_Enc='US7ASCII'):
+        '''
+        对TimesTen的JDBC链接进行初始化
+        abIn_ip     Altibase的主机IP
+        abIn_port   Altibase的监听端口
+        abIn_dsn    Altibase的DB_NAME名称
+        abIn_uid    Altibase的用户名
+        abIn_pwd    Altibase的密码
+        abIn_Enc    Altibase的编码类型
+        '''
+        DB_JDBC.__init__(self)
+        
+        #建立JDBC链接
+        Class.forName("Altibase.jdbc.driver.AltibaseDriver")
+        DriverManager.setLoginTimeout(5)
+        self.con = DriverManager.getConnection(
+                   "jdbc:Altibase://%s:%s/%s?user=%s&password=%s&encoding=%s"
+                   % (abIn_ip, abIn_port, abIn_dsn, abIn_uid, abIn_pwd, abIn_Enc))
         
         #取消自动commit
         self.con.setAutoCommit(False)
@@ -369,9 +402,20 @@ class SyncEngine(object):
         
         #获取MDB链接信息
         self.mdbType = ini.getConf('COMMON','MDB_TYPE')
-        self.mdbDsn = ini.getConf('TIMESTEN','TT_DSN')
-        self.mdbUid = ini.getConf('TIMESTEN','TT_UID')
-        self.mdbPwd = ini.getConf('TIMESTEN','TT_PWD')
+        
+        if self.mdbType == 'TT':
+            self.mdbDsn = ini.getConf('TIMESTEN','TT_DSN')
+            self.mdbUid = ini.getConf('TIMESTEN','TT_UID')
+            self.mdbPwd = ini.getConf('TIMESTEN','TT_PWD')
+        elif self.mdbType == 'AB':
+            self.mdbIp  = ini.getConf('ALITBASE','AB_IP')
+            self.mdbPort= ini.getConf('ALITBASE','AB_PORT')
+            self.mdbDsn = ini.getConf('ALITBASE','AB_DBNAME')
+            self.mdbUid = ini.getConf('ALITBASE','AB_USER')
+            self.mdbPwd = ini.getConf('ALITBASE','AB_PASSWORD')
+            self.mdbEnc = ini.getConf('ALITBASE','AB_ENCODING')
+        else:
+            myLog.critical(u'配置错误，不可识别的MDB类型：%s' % self.mdbType)
         
         #获取Oracle链接信息
         self.oraUsr = ini.getConf('COMMON','ORA_USR')
@@ -385,7 +429,7 @@ class SyncEngine(object):
         self.ora = JDBC_Oracle(self.oraIp, self.oraPort,
                                self.oraSid, self.oraUsr, self.oraPwd )
         
-        self.tt = None
+        self.mdb = None
         
     def wConf(self):
         '''将更新时间写入配置文件'''
@@ -395,30 +439,28 @@ class SyncEngine(object):
         
     def __del__(self):
         del self.myArray
-        del self.tt
+        del self.mdb
         del self.ora
         
     def loadData(self):
         '''从MDB中获取数据'''
-        _qNumber = 0
         if (self.mdbType == 'TT'):
-            _qNumber = self.loadDataTT()
+            myLog.info(u'从TimesTen库中获取数据：[%s/%s@%s]'
+                            % ( self.mdbDsn, self.mdbUid, self.mdbPwd )
+                      )
+                      
+            #链接MDB数据库
+            self.mdb = JDBC_TimesTen( self.mdbDsn, self.mdbUid, self.mdbPwd )
+            myLog.info(u'链接数据库成功！')
         elif (self.mdbType == 'AB'):
-            _qNumber = self.loadDataAB()
-        else:
-            myLog.critical(u'错误的MDB类型：%S' % self.mdbType)
-            
-        return _qNumber
-            
-    def loadDataTT(self):
-        '''从TimesTen库中加载数据'''
-        myLog.info(u'从TimesTen库中获取数据：[%s/%s@%s]'
-                        % ( self.mdbDsn, self.mdbUid, self.mdbPwd )
+            myLog.info(u'从Altibase库中获取数据：[//%s:%s/%s?user=%s&password=%s&encoding=%s]'
+              % (self.mdbIp, self.mdbPort, self.mdbDsn, self.mdbUid, self.mdbPwd, self.mdbEnc )
                   )
                   
-        #链接MDB数据库
-        self.tt = JDBC_TimesTen( self.mdbDsn, self.mdbUid, self.mdbPwd )
-        myLog.info(u'链接数据库成功！')
+            #链接MDB数据库
+            self.mdb = JDBC_Altibase( self.mdbIp, self.mdbPort, self.mdbDsn,
+                                     self.mdbUid, self.mdbPwd, self.mdbEnc )
+            myLog.info(u'链接数据库成功！')
         
         #解析字段类型
         ft = FiledType(ini_sql.getConf('SQL_TEMPLATE' + self.templateNumber,
@@ -436,26 +478,24 @@ class SyncEngine(object):
         myLog.debug(u'获取数据模板：[%s]' % selSqlTemplate)
         
         #获取数据集
-        self.tt.queryData(selSqlTemplate, (self.localTime,), _dict )
+        self.mdb.queryData(selSqlTemplate, (self.localTime,), _dict )
         
-        qNumber = 0
-        while (self.tt.fetchNext()):
-            #print "bal_id=",self.tt.getString('bal_id').encode('utf-8')
-            #print "ACCT_ID=",self.tt.getInt('ACCT_ID')
-            qNumber += 1
+        _qNumber = 0
+        while (self.mdb.fetchNext()):
+            _qNumber += 1
             for _num in range(1,max(fieldTypeDict)+1):
                 if fieldTypeDict[_num] in ['int']:
-                    myLog.debug( "%d=%d" % (_num, self.tt.getInt(_num)) )
-                    self.myArray.add(self.tt.getInt(_num))
+                    myLog.debug( "%d=%d" % (_num, self.mdb.getInt(_num)) )
+                    self.myArray.add(self.mdb.getInt(_num))
                 elif fieldTypeDict[_num] == 'long':
-                    myLog.debug( "%d=%d" % (_num, self.tt.getLong(_num)) )
-                    self.myArray.add(self.tt.getLong(_num))
+                    myLog.debug( "%d=%d" % (_num, self.mdb.getLong(_num)) )
+                    self.myArray.add(self.mdb.getLong(_num))
                 elif fieldTypeDict[_num] == 'string':
-                    myLog.debug( "%d=%s" % (_num, self.tt.getString(_num)) )
-                    self.myArray.add(self.tt.getString(_num))
+                    myLog.debug( "%d=%s" % (_num, self.mdb.getString(_num)) )
+                    self.myArray.add(self.mdb.getString(_num))
                 elif fieldTypeDict[_num] == 'float':
-                    myLog.debug( "%d=%f" % (_num, self.tt.getFloat(_num)) )
-                    self.myArray.add(self.tt.getFloat(_num))
+                    myLog.debug( "%d=%f" % (_num, self.mdb.getFloat(_num)) )
+                    self.myArray.add(self.mdb.getFloat(_num))
                 else:
                     myLog.critical(u'配置错误，不支持的数据类型：%s' % fieldTypeDict[_num])
                     
@@ -463,11 +503,10 @@ class SyncEngine(object):
             myLog.debug(u'本批数据已经获取完毕：%s' % self.myArray.dict)
             self.myArray.addBatch()
             
-        return qNumber
-            
-    def loadDataAB(self):
-        '''从Altibase库中加载数据'''
-        pass
+            if (_qNumber % int(ini.getConf('COMMON','FETCH_LIMIT')) == 0):
+                myLog.info(u'加载数据[%s]条！' % _qNumber)
+                
+        return _qNumber
         
     def out(self):
         '''将需入库数据打印出来'''
