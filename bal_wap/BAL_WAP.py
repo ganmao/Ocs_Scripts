@@ -539,7 +539,6 @@ class SyncEngine(object):
             self.deleteData()
             self.insertData()
             self.myArray.clean()
-            se.wConf()
             
         return _qNumber
         
@@ -666,10 +665,11 @@ if __name__ == '__main__':
                     se.deleteData()
                     #插入需更新数据
                     se.insertData()
-                    #将跟新时间点写入配置文件
-                    se.wConf()
-                
+                    
                 del se
+                
+                #将跟新时间点写入配置文件
+                se.wConf()
                 
             #同步间隔
             myLog.info(u'同步间隔休息。。。[%d]秒' % upRate)
