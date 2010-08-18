@@ -1,4 +1,6 @@
 jython安装方法：
+
+jython下载地址：http://sourceforge.net/projects/jython/files/jython/jython_installer-2.5.1.jar
 ==============================================================================
 1，将jython_installer-2.5.1.jar上传到scripts目录下
 
