@@ -10,6 +10,14 @@ import logging
 import signal
 from sys import exit
 
+#定义部分程序默认参数
+#=============================================================================
+DB_lOGININ_TIMEOUT = 10
+DB_QUERY_TIMEOUT = 60
+SLEEP_TIME_LIMIT = 600
+#=============================================================================
+
+
 def initLogging(inLogFile):
     myLog = None
     
@@ -133,6 +141,7 @@ class DB_JDBC(object):
             else:
                 myLog.critical(u'配置错误，未知的类型：%s'
                                 % paramFiledType[_n])
+                exit(2)
         
         self.rs = self.pStmt.executeQuery()
         return self.rs
@@ -196,6 +205,7 @@ class DB_JDBC(object):
                 else:
                     myLog.critical(u'配置错误，不支持的数据类型：%s'
                                     % fieldTypeDict[int(_k)])
+                    exit(2)
                 
             myLog.debug(u'数据完成初始化![%s]' % _dict)
             self.pStmt.addBatch()
@@ -244,6 +254,7 @@ class DB_JDBC(object):
                 else:
                     myLog.critical(u'配置错误，不支持的数据类型：%s'
                                    % fieldTypeDict[_dkey])
+                    exit(2)
                     
             myLog.debug(u'数据完成初始化![%s]' % _dict)
             self.pStmt.addBatch()
@@ -276,7 +287,7 @@ class JDBC_TimesTen(DB_JDBC):
         
         #建立JDBC链接
         Class.forName("com.timesten.jdbc.TimesTenDriver")
-        DriverManager.setLoginTimeout(5)
+        DriverManager.setLoginTimeout(DB_lOGININ_TIMEOUT)
         self.con = DriverManager.getConnection("jdbc:timesten:direct:dsn=%s;uid=%s;pwd=%s;"
                                         % (ttIn_dsn, ttIn_uid, ttIn_pwd))
         
@@ -287,7 +298,7 @@ class JDBC_TimesTen(DB_JDBC):
         self.stmt = self.con.createStatement()
         
         #设置查询超时时间
-        self.stmt.setQueryTimeout(10)
+        self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
     def __del__(self):
         DB_JDBC.__del__(self)
@@ -308,7 +319,7 @@ class JDBC_Altibase(DB_JDBC):
         
         #建立JDBC链接
         Class.forName("Altibase.jdbc.driver.AltibaseDriver")
-        DriverManager.setLoginTimeout(5)
+        DriverManager.setLoginTimeout(DB_lOGININ_TIMEOUT)
         self.con = DriverManager.getConnection(
                    "jdbc:Altibase://%s:%s/%s?user=%s&password=%s&encoding=%s"
                    % (abIn_ip, abIn_port, abIn_dsn, abIn_uid, abIn_pwd, abIn_Enc))
@@ -320,7 +331,7 @@ class JDBC_Altibase(DB_JDBC):
         self.stmt = self.con.createStatement()
         
         #设置查询超时时间
-        self.stmt.setQueryTimeout(10)
+        self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
     def __del__(self):
         DB_JDBC.__del__(self)
@@ -340,7 +351,7 @@ class JDBC_Oracle(DB_JDBC):
         
         #建立JDBC链接
         Class.forName("oracle.jdbc.driver.OracleDriver")
-        DriverManager.setLoginTimeout(10)
+        DriverManager.setLoginTimeout(DB_lOGININ_TIMEOUT)
         self.con = DriverManager.getConnection("jdbc:oracle:thin:@%s:%s:%s" %
                                            ( oraIn_ip, oraIn_port, oraIn_dsn),
                                              oraIn_uid, oraIn_pwd )
@@ -352,7 +363,7 @@ class JDBC_Oracle(DB_JDBC):
         self.stmt = self.con.createStatement()
         
         #设置查询超时时间
-        self.stmt.setQueryTimeout(20)
+        self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
     def __del__(self):
         DB_JDBC.__del__(self)
@@ -386,6 +397,10 @@ class UpdateArray(object):
     def out(self):
         print self.array
         
+    def clean(self):
+        '''清理'''
+        self.array = []
+        
 class SyncEngine(object):
     '''同步数据管理引擎'''
     def __init__(self, inTemplateNumber, inUpTime):
@@ -402,6 +417,11 @@ class SyncEngine(object):
         
         #获取MDB链接信息
         self.mdbType = ini.getConf('COMMON','MDB_TYPE')
+        myLog.info(u'MDB类型：%s' % self.mdbType)
+        
+        #获取同步方式
+        self.syncType = int(ini.getConf('COMMON','SYNC_TYPE'))
+        myLog.info(u'数据同步方式：%d' % self.syncType)
         
         if self.mdbType == 'TT':
             self.mdbDsn = ini.getConf('TIMESTEN','TT_DSN')
@@ -416,6 +436,7 @@ class SyncEngine(object):
             self.mdbEnc = ini.getConf('ALITBASE','AB_ENCODING')
         else:
             myLog.critical(u'配置错误，不可识别的MDB类型：%s' % self.mdbType)
+            exit(2)
         
         #获取Oracle链接信息
         self.oraUsr = ini.getConf('COMMON','ORA_USR')
@@ -498,14 +519,28 @@ class SyncEngine(object):
                     self.myArray.add(self.mdb.getFloat(_num))
                 else:
                     myLog.critical(u'配置错误，不支持的数据类型：%s' % fieldTypeDict[_num])
+                    exit(2)
                     
             #一条数据加载完毕
             myLog.debug(u'本批数据已经获取完毕：%s' % self.myArray.dict)
             self.myArray.addBatch()
             
             if (_qNumber % int(ini.getConf('COMMON','FETCH_LIMIT')) == 0):
-                myLog.info(u'加载数据[%s]条！' % _qNumber)
-                
+                if self.syncType == 1:
+                    self.deleteData()
+                    self.insertData()
+                    self.myArray.clean()
+                    myLog.info(u'本批次加载数据[%s]条！' % _qNumber)
+                else:
+                    myLog.info(u'当前共加载数据[%s]条！' % _qNumber)
+                    
+        myLog.info(u'加载完成，共加载数据[%s]条！' % _qNumber)
+        if self.syncType == 1:
+            self.deleteData()
+            self.insertData()
+            self.myArray.clean()
+            se.wConf()
+            
         return _qNumber
         
     def out(self):
@@ -599,9 +634,9 @@ if __name__ == '__main__':
         #获取UP_RATE，扫描间隔时间，默认不小于600秒AST
         upRate = int(ini.getConf('COMMON','UP_RATE'))
         myLog.info(u'获取到更新时间间隔：%s' % upRate)
-        if upRate < 600:
-            myLog.warning(u'同步间隔小于600秒，强制设置为600秒')
-            upRate = 600
+        if upRate < SLEEP_TIME_LIMIT:
+            myLog.warning(u'同步间隔小于程序默认最小值，强制设置为[%d]秒！' % SLEEP_TIME_LIMIT)
+            upRate = SLEEP_TIME_LIMIT
             
         sTime = ini_sql.defaults()['update_date']
         myLog.info(u'更新开始时间：[%s]' % sTime)
@@ -625,7 +660,7 @@ if __name__ == '__main__':
                 
                 myCount = se.loadData()
                 myLog.info(u'共获取到数据[%d]条！' % myCount)
-                if (myCount > 0):
+                if ( (myCount > 0) and (se.syncType != 1) ):
                     #se.out()
                     #删除表中已有数据
                     se.deleteData()
