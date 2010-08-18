@@ -1,4 +1,5 @@
 jython安装方法：
+==============================================================================
 1，将jython_installer-2.5.1.jar上传到scripts目录下
 
 2，在scripts目录下建立目录jython
@@ -116,3 +117,43 @@ bal_wap.ini -- 通用配置
 bal_wap_sql.ini -- sql配置
 
 11，采用 create_table.sql 中的脚本在RB库中建立相应同步信息表
+
+12，执行方式
+scripts >jython/jython BAL_WAP.py
+
+==============================================================================
+同步表模板配置方法：
+==============================================================================
+1，现在rb库中建立相应的内存数据库对应表
+2，配置bal_wap_sql.ini模板
+    ##################################################
+    [DEFAULT]
+    ;指定更新的开始时间，可以带入模板的sql中,每次更新后程序也会更新这个参数
+    ;如SELECT_SQL中使用的 %(UPDATE_DATE)s 即为获取本参数
+    update_date=20000810000000
+    ;执行需要执行的模板数，程序会根据模板数遍历
+    template_num=1
+
+    [SQL_TEMPLATE1]
+    ;从MDB选择数据的sql，注意：date类型要转为char类型
+    SELECT_SQL=select BAL_ID,ACCT_ID,ACCT_RES_ID,GROSS_BAL,RESERVE_BAL,CONSUME_BAL,TO_CHAR(EFF_DATE, 'yyyymmddhh24miss'),NVL(TO_CHAR(EXP_DATE, 'yyyymmddhh24miss'),'20500101000000'),TO_CHAR(UPDATE_DATE, 'yyyymmddhh24miss'),NVL(CEIL_LIMIT,0),NVL(BAL_CODE,0) from bal where UPDATE_DATE > to_date('%(UPDATE_DATE)s', 'yyyymmddhh24miss') and UPDATE_DATE <= to_date(?, 'yyyymmddhh24miss')
+    ;插入Oracle数据的sql，注意：1，字段要与SELECT_SQL的字段一致。2，日期的字符串要转为date类型
+    INSERT_SQL=INSERT INTO BAL_WAP (BAL_ID,ACCT_ID,ACCT_RES_ID,GROSS_BAL,RESERVE_BAL,CONSUME_BAL,EFF_DATE,EXP_DATE,UPDATE_DATE,CEIL_LIMIT,BAL_CODE) VALUES (?,?,?,?,?,?,TO_DATE(?, 'yyyymmddhh24miss'),TO_DATE(?, 'yyyymmddhh24miss'),TO_DATE(?, 'yyyymmddhh24miss'),?,?)
+    ;数据类型定义，目前支持的数据类型：int,long,string,float
+    ;注意：字段个数要与SELEXT_SQL中的对应，类型也要一一对应
+    SELECT_FIELD_TYPE=1:int,2:int,3:int,4:long,5:long,6:long,7:string,8:string,9:string,10:int,11:long
+    ;SELECT_SQL可以支持参数，见例子中的 ？
+    ;此处设定参数的数据类型
+    SELECT_PARAM_TYPE=1:string
+    
+    ;因为同步数据不做UPDATE操作，直接根据DELETE_KEY指定的字段进行删除，删除配置根据一下三个设定
+    ;指定删除的语句，?代表参数
+    DELETE_SQL=delete from bal_wap where bal_id = ?
+    ;指定参数的数据类型
+    DELETE_PARAM_TYPE=1:int
+    ;指定删除时的关键字段，根据SELECT_SQL中对应字段获取值，多个参数用逗号分隔
+    DELETE_KEY=1
+    ###################################################
+    
+    
+    
