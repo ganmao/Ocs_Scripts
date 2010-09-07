@@ -12,7 +12,7 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   GC_PROVINCE CONSTANT CHAR(2) := 'SD';
 
   -- 需要统计的余额类型
-  GC_RES_TYPE CONSTANT VARCHAR2(100) := '1, 16, 17, 23, 25, 26, 27, 28, 30, 31, 41, 116, 156, 172';
+  GC_RES_TYPE CONSTANT VARCHAR2(400) := '1,2,17,23,25,26,27,28,30,31,32,33,36,37,39,40,41,42,43,44,51,52,53,54,55,56,59,60,63,64,65,67,68,69,70,71,71,74,85,90,116,131,136,138,141,142,144,145,146,147,148,149,150,151,152,153,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,174,176';
 
   -- 指定CPU并发数,危险参数！
   GC_CPU_NUM CONSTANT NUMBER := 18;
@@ -496,7 +496,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID1 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID1 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -539,7 +539,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID2 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID2 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -571,7 +571,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID3 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID3 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -603,7 +603,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID4 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID4 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -636,7 +636,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID1 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_C_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID1 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -668,7 +668,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID2 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_C_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID2 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -700,7 +700,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID3 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_C_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID3 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -732,7 +732,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      ACCT_ITEM_TYPE_ID4 "ACCT_ITEM_TYPE_ID"
                 FROM EVENT_USAGE_C_' || INV_BILLINGCYCLEID || '
                WHERE ACCT_ITEM_TYPE_ID4 != -1
-                 AND STATE in (''A'',''C'')
+                 AND STATE in (''A'')
                GROUP BY SUBS_ID,
                         SERVICE_TYPE,
                         RE_ID,
@@ -1019,6 +1019,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                           'yyyymmddhh24miss');
   
     -- 先将本帐期数据，且ACCT_BOOK_TYPE in ('H', 'P', 'Q', 'V')的数据放入临时表，以较少数据量
+    --P从payment表统计  H的从acct_book里统计
     V_SQL := 'CREATE TABLE ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
@@ -1031,11 +1032,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      AB.CREATED_DATE,
                      AB.CONTACT_CHANNEL_ID,
                      AB.PARTY_CODE,
-                     SUM(AB.CHARGE) "CHARGE_FEE"
+                     SUM(SC.submit_amount) "CHARGE_FEE"
                 FROM ACCT_BOOK@LINK_CC AB, ' ||
-             GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' SA
-               WHERE ACCT_BOOK_TYPE IN (''H'', ''P'', ''Q'', ''V'')
-                 AND (AB.ACCT_ID = SA.ACCT_ID OR AB.ACCT_ID = SA.CREDIT_ACCT)
+             GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' SA,payment@LINK_CC  SC
+               WHERE ACCT_BOOK_TYPE IN (''P'')
+                 AND AB.ACCT_ID = SA.ACCT_ID
+                 AND AB.acct_book_id=SC.Payment_Id(+)
                  AND AB.CREATED_DATE >= to_date(' ||
              V_BEGIN_DATE ||
              ', ''yyyymmddhh24miss'')
@@ -1057,7 +1059,36 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '本帐期临时ACCT_BOOK表建立完毕！' || V_TMP_ACCTOOK ||
                 INV_BILLINGCYCLEID);
     COMMIT;
-  
+    V_SQL := 'INSERT ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+              SELECT SA.SUBS_ID,
+                     AB.ACCT_ID,
+                     AB.BAL_ID,
+                     AB.ACCT_RES_ID,
+                     AB.ACCT_BOOK_TYPE,
+                     AB.CREATED_DATE,
+                     AB.CONTACT_CHANNEL_ID,
+                     AB.PARTY_CODE,
+                     SUM(AB.CHARGE) "CHARGE_FEE"
+                FROM ACCT_BOOK@LINK_CC AB, ' ||
+             GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' SA
+               WHERE ACCT_BOOK_TYPE IN (''H'',''V'')
+                 AND AB.ACCT_ID = SA.ACCT_ID        
+                 AND AB.CREATED_DATE >= to_date(' ||
+             V_BEGIN_DATE ||
+             ', ''yyyymmddhh24miss'')
+                 AND AB.CREATED_DATE < to_date(' || V_END_DATE ||
+             ', ''yyyymmddhh24miss'')
+               GROUP BY SA.SUBS_ID,
+                        AB.ACCT_ID,
+                        AB.BAL_ID,
+                        AB.ACCT_RES_ID,
+                        AB.ACCT_BOOK_TYPE,
+                        AB.CREATED_DATE,
+                        AB.PARTY_CODE,
+                        AB.CONTACT_CHANNEL_ID
+               ';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
     -- 给临时表建立索引
     V_SQL := 'CREATE INDEX IDX_balrp_t5' || INV_BILLINGCYCLEID || ' ON ' ||
              V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
@@ -1113,19 +1144,27 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 统计用户 现金缴费 SERVICE_TYPE = 200
     -- 999001是开户预存款，999999是预存转兑（可以在配置文件中配置）
     -- 现在将999999归入先进缴费统计中,现场可以根据余额类型将其剔除
+    /*
+    山东现场特殊处理，现场现金调帐流程：
+        找到需要调帐的话单，计算出来调帐的金额，通知bss在库中删除相应话单
+	ocs也删除相应话单，并且通过调帐接口给用户本金调增相应费用。
+	
+	因直接删除话单操作，造成余额不平，故在统计中加入（ACCT_RES_ID != 1）
+    */
     IF GC_PROVINCE = 'SD' THEN
       V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
                 NOLOGGING
                 AS
                 SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID, 
-                       200 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                       200 "SERVICE_TYPE", sum(A.CHARGE_FEE) "CHARGE_FEE"
                   FROM ' || V_TMP_ACCTOOK ||
                INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || ' U
                  WHERE A.CONTACT_CHANNEL_ID = 1
                    AND A.PARTY_CODE = ''999999'' 
                    AND A.ACCT_BOOK_TYPE = (''H'')
+                   AND ACCT_RES_ID != 1
                    AND A.SUBS_ID = U.SUBS_ID
                    AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                  GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
@@ -1140,7 +1179,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 1
                  AND A.PARTY_CODE IS NULL 
-                 AND ( A.ACCT_BOOK_TYPE = (''P'') OR  (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0) )
+                 AND ( A.ACCT_BOOK_TYPE = (''P''))
                  AND A.SUBS_ID = U.SUBS_ID
                  AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID';
@@ -1178,7 +1217,27 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '插入用户现金缴费完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-  
+    IF GC_PROVINCE = 'SD' THEN
+    -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
+                     201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 4
+                 AND A.ACCT_BOOK_TYPE = (''P'')
+                 AND A.SUBS_ID = U.SUBS_ID
+                 AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
+    ELSE
     -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
     V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
              INV_BILLINGCYCLEID || '
@@ -1198,7 +1257,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-  
+    END IF;
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
     V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
              INV_BILLINGCYCLEID || '
@@ -1224,7 +1283,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                INV_BILLINGCYCLEID || ' A,' || GC_USER_TAB_NAME ||
                INV_BILLINGCYCLEID || ' U
                  WHERE A.CONTACT_CHANNEL_ID = 1
-                   AND (A.ACCT_BOOK_TYPE = ''P'' OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
+                   AND (A.ACCT_BOOK_TYPE = ''P'')
                    AND A.PARTY_CODE IS NOT NULL
                    AND A.SUBS_ID = U.SUBS_ID
                    AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
@@ -1258,7 +1317,28 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '插入用户银行卡充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-  
+
+    -- 统计用户 空中充值 SERVICE_TYPE = 204
+    IF GC_PROVINCE = 'SD' THEN
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+             INV_BILLINGCYCLEID || '
+              SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
+                     204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
+                FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
+             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               WHERE A.CONTACT_CHANNEL_ID = 7
+                 AND A.ACCT_BOOK_TYPE = (''P'')
+                 AND A.SUBS_ID = U.SUBS_ID
+                 AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
+               GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
+               ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;    
+    ELSE
     -- 统计用户 空中充值 SERVICE_TYPE = 204
     V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
              INV_BILLINGCYCLEID || '
@@ -1276,9 +1356,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
-                '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-  
+    END IF;
     -- 创建表索引
     V_SQL := 'CREATE INDEX IDX_balrp_t11' || INV_BILLINGCYCLEID || ' ON ' ||
              INV_TABLENAME || INV_BILLINGCYCLEID || '
@@ -1553,7 +1633,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
           + NVL(ABS(SUM(A4.CHARGE_FEE)),0)
           - NVL(ABS(SUM(C.CHARGE_FEE)),0))*(0.01) "月末余额",
          NVL(ABS(SUM(B3.CHARGE_FEE)),0)*(0.01) "月末余额（正）",
-         NVL(SUM(B4.CHARGE_FEE),0)*(-0.01) "月末余额（负）",
+         NVL(ABS(SUM(B4.CHARGE_FEE)),0)*(0.01) "月末余额（负）",
          NVL((ABS((NVL(ABS(SUM(B1.CHARGE_FEE)),0)
                   + NVL(ABS(SUM(A1.CHARGE_FEE)),0)
                   + NVL(ABS(SUM(A2.CHARGE_FEE)),0)
