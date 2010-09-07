@@ -47,6 +47,9 @@ CREATE OR REPLACE PACKAGE BALRP_PKG_FOR_CUC IS
   -- 新 CU_BAL_CHECK
   GC_CU_BAL_CHECK CONSTANT USER_TABLES.TABLE_NAME%TYPE := 'balrp_cu_bal_check_';
 
+  -- 配置延迟X小时内BSS转OCS用户充值话单处理完毕（山东专用）
+  GC_EXP_PAID_DIVERT_HOUR CONSTANT NUMBER := 8;
+
   EXP_CREATE_TMP_TAB_ERR EXCEPTION;
   -- ==================================================
 
@@ -381,25 +384,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                                 INV_TABLENAME      USER_TABLES.TABLE_NAME%TYPE) IS
     V_SQL VARCHAR2(4000);
   BEGIN
-    --创建用户信息表,并且采集数据
-    /*    V_SQL := 'create table ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
-    TABLESPACE TAB_RB
-    NOLOGGING
-    as 
-    SELECT S.SUBS_ID,
-           S.ACC_NBR,
-           S.AREA_ID,
-           S.SUBS_CODE,
-           P.PROD_STATE,
-           P.BLOCK_REASON,
-           S.ACCT_ID "credit_acct",
-           SA.ACCT_ID
-      FROM SUBS@LINK_CC S, PROD@LINK_CC P, SUBS_ACCT@LINK_CC SA
-     WHERE S.SUBS_ID = P.PROD_ID
-       AND S.SUBS_ID = SA.SUBS_ID
-     ';*/
-  
+    -- 创建用户信息表,并且采集数据
     -- 根据王伟提供的新脚本来获取
+    -- zdl 20100907 用户信息表新增'EXP_PAID_DIVERT'字段，保存用户预后互转信息
     V_SQL := 'create table ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
@@ -414,7 +401,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      P.BLOCK_REASON,
                      S.ACCT_ID "CREDIT_ACCT",
                      SA.ACCT_ID,
-                     A.ACCT_NBR
+                     A.ACCT_NBR,
+                     ''<NULL>'' "EXP_PAID_DIVERT"
                 FROM SUBS@LINK_CC      S,
                      PROD@LINK_CC      P,
                      SUBS_ACCT@LINK_CC SA,
@@ -433,12 +421,39 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                ';
   
     EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_USERINFO',
+                SQLCODE,
+                '用户信息表创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+  
+    -- zdl 20100907 填值用户信息表'EXP_PAID_DIVERT'字段 -- 用户预后互转信息
+    -- 区分用户
+    -- EXP_PAID_DIVERT=“00 预约OCS转Billing”
+    -- EXP_PAID_DIVERT=“01 取消预约OCS转Billing”
+    -- EXP_PAID_DIVERT=“02 预约Billing转OCS”
+    -- EXP_PAID_DIVERT=“03 取消预约Billing转OCS”
+    V_SQL := 'UPDATE ' || INV_TABLENAME || INV_BILLINGCYCLEID || ' U
+              SET EXP_PAID_DIVERT =
+                  (SELECT PAV.VALUE
+                     FROM PROD_ATTR_VALUE@LINK_CC PAV
+                    WHERE U.SUBS_ID = PAV.PROD_ID
+                      AND PAV.ATTR_ID =
+                          (SELECT ATTR_ID
+                             FROM ATTR@LINK_CC
+                            WHERE ATTR_CODE = ''EXP_PAID_DIVERT''))';
+  
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_USERINFO',
+                SQLCODE,
+                '用户预后互转信息更新完毕：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+    COMMIT;
   
     IF PF_JUDGE_TAB_EXIST(INV_TABLENAME || INV_BILLINGCYCLEID) = 1 THEN
       PP_PRINTLOG(3,
                   'PP_COLLECT_USERINFO',
                   SQLCODE,
-                  '表创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
+                  '表创建完成：' || INV_TABLENAME || INV_BILLINGCYCLEID);
     
       -- 创建表索引
       V_SQL := 'CREATE INDEX IDX_balrp_t1' || INV_BILLINGCYCLEID || ' ON ' ||
@@ -460,7 +475,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                   'PP_COLLECT_USERINFO',
                   SQLCODE,
                   '表索引创建成功：' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    
+      COMMIT;
     END IF;
   END;
 
@@ -1019,7 +1034,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                           'yyyymmddhh24miss');
   
     -- 先将本帐期数据，且ACCT_BOOK_TYPE in ('H', 'P', 'Q', 'V')的数据放入临时表，以较少数据量
-    --P从payment表统计  H的从acct_book里统计
+    -- P从payment表统计  V，H的从acct_book里统计
+  
     V_SQL := 'CREATE TABLE ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
               TABLESPACE TAB_RB
               NOLOGGING
@@ -1034,7 +1050,8 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                      AB.PARTY_CODE,
                      SUM(SC.submit_amount) "CHARGE_FEE"
                 FROM ACCT_BOOK@LINK_CC AB, ' ||
-             GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' SA,payment@LINK_CC  SC
+             GC_USER_TAB_NAME || INV_BILLINGCYCLEID ||
+             ' SA,payment@LINK_CC  SC
                WHERE ACCT_BOOK_TYPE IN (''P'')
                  AND AB.ACCT_ID = SA.ACCT_ID
                  AND AB.acct_book_id=SC.Payment_Id(+)
@@ -1059,7 +1076,9 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '本帐期临时ACCT_BOOK表建立完毕！' || V_TMP_ACCTOOK ||
                 INV_BILLINGCYCLEID);
     COMMIT;
-    V_SQL := 'INSERT ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
+  
+    V_SQL := 'INSERT /*+ APPEND */ INTO ' || V_TMP_ACCTOOK ||
+             INV_BILLINGCYCLEID || '
               SELECT SA.SUBS_ID,
                      AB.ACCT_ID,
                      AB.BAL_ID,
@@ -1087,8 +1106,88 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                         AB.PARTY_CODE,
                         AB.CONTACT_CHANNEL_ID
                ';
+    EXECUTE IMMEDIATE V_SQL;
+    PP_PRINTLOG(3,
+                'PP_COLLECT_ACCTBOOK',
+                0,
+                '本帐期临时ACCT_BOOK表插入V|K数据完毕！' || V_TMP_ACCTOOK ||
+                INV_BILLINGCYCLEID);
+    COMMIT;
+  
+    -- zdl 20100903 山东特殊处理：
+    --              预约Billing转OCS的用户，因为第一笔充值是1号后送达，
+    --              1,  需要将其归入上个月帐期统计（从本帐期减去）.
+    --              2,  下月本帐期的钱需要再次获取一下
+    --
+    -- 判断预转后用户费用条件：
+    --              1，用户属性--EXP_PAID_DIVERT=02
+    --              2，充值渠道--1
+    --              3，充值时间--从帐期结束时间延迟X小时
+    IF GC_PROVINCE = 'SD' THEN
+      -- 删除统计本帐期初bss转ocs的充值
+      V_SQL := 'DELETE FROM BALRP_ACCTBOOK_TMP_219 BAT
+                 WHERE BAT.CONTACT_CHANNEL_ID = 1
+                   AND BAT.ACCT_BOOK_TYPE = ''P''
+                   AND BAT.SUBS_ID IN (SELECT U.SUBS_ID
+                                     FROM BALRP_USER_219 U
+                                    WHERE U.EXP_PAID_DIVERT = ''02''
+                                      AND U.SUBS_ID = BAT.SUBS_ID)
+                   AND BAT.CREATED_DATE BETWEEN
+                         TO_DATE(' || V_BEGIN_DATE ||
+               ', ''yyyymmddhh24miss'') AND
+                         TO_DATE(' || V_BEGIN_DATE ||
+               ', ''yyyymmddhh24miss'') + ' || GC_EXP_PAID_DIVERT_HOUR ||
+               ' * 1 / 24';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '山东特殊处理-清理本月表中上月BSS转OCS充值费用完成!' || V_TMP_ACCTOOK ||
+                  INV_BILLINGCYCLEID);
+    
+      -- 获取下帐期bss转ocs的充值
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || V_TMP_ACCTOOK ||
+               INV_BILLINGCYCLEID || '
+              SELECT SA.SUBS_ID,
+                     AB.ACCT_ID,
+                     AB.BAL_ID,
+                     AB.ACCT_RES_ID,
+                     AB.ACCT_BOOK_TYPE,
+                     AB.CREATED_DATE,
+                     AB.CONTACT_CHANNEL_ID,
+                     AB.PARTY_CODE,
+                     SUM(SC.submit_amount) "CHARGE_FEE"
+                FROM ACCT_BOOK@LINK_CC AB, ' ||
+               GC_USER_TAB_NAME || INV_BILLINGCYCLEID ||
+               ' SA,payment@LINK_CC  SC
+               WHERE ACCT_BOOK_TYPE IN (''P'')
+                 AND AB.ACCT_ID = SA.ACCT_ID
+                 AND AB.acct_book_id=SC.Payment_Id(+)
+                 AND SA.exp_paid_divert = ''02''
+                 AND AB.CONTACT_CHANNEL_ID = 1
+                 AND AB.CREATED_DATE BETWEEN to_date(' ||
+               V_END_DATE || ', ''yyyymmddhh24miss'')
+                 AND to_date(' || V_END_DATE ||
+               ', ''yyyymmddhh24miss'')  + ' || GC_EXP_PAID_DIVERT_HOUR ||
+               ' * 1 / 24
+               GROUP BY SA.SUBS_ID,
+                        AB.ACCT_ID,
+                        AB.BAL_ID,
+                        AB.ACCT_RES_ID,
+                        AB.ACCT_BOOK_TYPE,
+                        AB.CREATED_DATE,
+                        AB.PARTY_CODE,
+                        AB.CONTACT_CHANNEL_ID';
+      EXECUTE IMMEDIATE V_SQL;
+      COMMIT;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '山东特殊处理-从下帐期获取BSS转OCS用户充值费用!' || V_TMP_ACCTOOK ||
+                  INV_BILLINGCYCLEID);
+    END IF;
+  
     -- 给临时表建立索引
     V_SQL := 'CREATE INDEX IDX_balrp_t5' || INV_BILLINGCYCLEID || ' ON ' ||
              V_TMP_ACCTOOK || INV_BILLINGCYCLEID || '
@@ -1125,7 +1224,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '本帐期临时ACCT_BOOK表索引建立完毕！' || V_TMP_ACCTOOK ||
                 INV_BILLINGCYCLEID);
     COMMIT;
-    
+  
     -- 将ACCT_BOOK临时表中，充值抵扣信用账本的记录，充值渠道更新为1
     V_SQL := 'UPDATE ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID || ' A
                  SET A.CONTACT_CHANNEL_ID = 1
@@ -1136,8 +1235,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     PP_PRINTLOG(3,
                 'PP_COLLECT_ACCTBOOK',
                 0,
-                '更新V充值记录的渠道信息完毕!' || V_TMP_ACCTOOK ||
-                INV_BILLINGCYCLEID);
+                '更新V充值记录的渠道信息完毕!' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID);
     COMMIT;
   
     -- 创建用户缴费信息统计表
@@ -1145,12 +1243,12 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     -- 999001是开户预存款，999999是预存转兑（可以在配置文件中配置）
     -- 现在将999999归入先进缴费统计中,现场可以根据余额类型将其剔除
     /*
-    山东现场特殊处理，现场现金调帐流程：
-        找到需要调帐的话单，计算出来调帐的金额，通知bss在库中删除相应话单
-	ocs也删除相应话单，并且通过调帐接口给用户本金调增相应费用。
-	
-	因直接删除话单操作，造成余额不平，故在统计中加入（ACCT_RES_ID != 1）
-    */
+      山东现场特殊处理，现场现金调帐流程：
+          找到需要调帐的话单，计算出来调帐的金额，通知bss在库中删除相应话单
+    ocs也删除相应话单，并且通过调帐接口给用户本金调增相应费用。
+    
+    因直接删除话单操作，造成余额不平，故在统计中加入（ACCT_RES_ID != 1）
+      */
     IF GC_PROVINCE = 'SD' THEN
       V_SQL := 'CREATE TABLE ' || INV_TABLENAME || INV_BILLINGCYCLEID || '
                 TABLESPACE TAB_RB
@@ -1218,45 +1316,45 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 '插入用户现金缴费完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
     IF GC_PROVINCE = 'SD' THEN
-    -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
-             INV_BILLINGCYCLEID || '
+      -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
                      201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 4
                  AND A.ACCT_BOOK_TYPE = (''P'')
                  AND A.SUBS_ID = U.SUBS_ID
                  AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
                ';
-    EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    COMMIT;
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+      COMMIT;
     ELSE
-    -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
-             INV_BILLINGCYCLEID || '
+      -- 统计用户 一卡冲缴费 SERVICE_TYPE = 201
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
                      201 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 4
                  AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND A. CHARGE_fee < 0))
                  AND A.SUBS_ID = U.SUBS_ID
                  AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
                ';
-    EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    COMMIT;
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+      COMMIT;
     END IF;
     -- 统计用户 开户预存款 SERVICE_TYPE = 202
     V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
@@ -1317,47 +1415,47 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
                 0,
                 '插入用户银行卡充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
     COMMIT;
-
+  
     -- 统计用户 空中充值 SERVICE_TYPE = 204
     IF GC_PROVINCE = 'SD' THEN
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
-             INV_BILLINGCYCLEID || '
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
                      204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 7
                  AND A.ACCT_BOOK_TYPE = (''P'')
                  AND A.SUBS_ID = U.SUBS_ID
                  AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
                ';
-    EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    COMMIT;    
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '插入用户空中充值数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+      COMMIT;
     ELSE
-    -- 统计用户 空中充值 SERVICE_TYPE = 204
-    V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
-             INV_BILLINGCYCLEID || '
+      -- 统计用户 空中充值 SERVICE_TYPE = 204
+      V_SQL := 'INSERT /*+ APPEND */ INTO ' || INV_TABLENAME ||
+               INV_BILLINGCYCLEID || '
               SELECT A.SUBS_ID, U.AREA_ID, A.ACCT_ID, A.BAL_ID, A.ACCT_RES_ID,
                      204 "SERVICE_TYPE", sum(A.CHARGE_fee) "CHARGE_FEE"
                 FROM ' || V_TMP_ACCTOOK || INV_BILLINGCYCLEID ||
-             ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
+               ' A,' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID || ' U
                WHERE A.CONTACT_CHANNEL_ID = 7
                  AND (A.ACCT_BOOK_TYPE IN (''H'',''P'') OR (A.ACCT_BOOK_TYPE = ''V'' AND  A.CHARGE_fee < 0))
                  AND A.SUBS_ID = U.SUBS_ID
                  AND A.ACCT_RES_ID IN (' || GC_RES_TYPE || ')
                GROUP BY A.ACCT_ID, A.SUBS_ID, U.AREA_ID, A.BAL_ID, A.ACCT_RES_ID
                ';
-    EXECUTE IMMEDIATE V_SQL;
-    PP_PRINTLOG(3,
-                'PP_COLLECT_ACCTBOOK',
-                0,
-                '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
-    COMMIT;
+      EXECUTE IMMEDIATE V_SQL;
+      PP_PRINTLOG(3,
+                  'PP_COLLECT_ACCTBOOK',
+                  0,
+                  '插入用户一卡冲缴费数据完成！' || INV_TABLENAME || INV_BILLINGCYCLEID);
+      COMMIT;
     END IF;
     -- 创建表索引
     V_SQL := 'CREATE INDEX IDX_balrp_t11' || INV_BILLINGCYCLEID || ' ON ' ||
@@ -1585,34 +1683,34 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
     ELSIF GC_PROVINCE = 'SD' THEN
       -- 山东特殊处理
       -- 删除测试号码的数据
-      V_SQL := 'delete from ' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID ||
+      /*      V_SQL := 'delete from ' || GC_USER_TAB_NAME || INV_BILLINGCYCLEID ||
                ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
-    
+      
       V_SQL := 'delete from ' || GC_CDR_TAB_NAME || INV_BILLINGCYCLEID ||
                ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
-    
+      
       V_SQL := 'delete from ' || GC_ACCTBOOK_TAB_NAME || INV_BILLINGCYCLEID ||
                ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
-    
+      
       V_SQL := 'delete from ' || GC_BAL_TAB_NAME || 'A_' ||
                INV_BILLINGCYCLEID ||
                ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
-    
+      
       V_SQL := 'delete from ' || GC_BAL_TAB_NAME || 'B_' ||
                INV_BILLINGCYCLEID ||
                ' where SUBS_ID in (SELECT DISTINCT subs_id FROM tt_ocssys_nr@link_cc)';
       EXECUTE IMMEDIATE V_SQL;
       COMMIT;
-    
-      PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '删除测试用户数据完成！');
+      
+      PP_PRINTLOG(3, 'PP_BUILD_REPORT', SQLCODE, '删除测试用户数据完成！');*/
     
       V_SQL := 'CREATE TABLE ' || GC_REPORT_TAB || INV_BILLINGCYCLEID || '
   TABLESPACE TAB_RB
@@ -1767,7 +1865,7 @@ CREATE OR REPLACE PACKAGE BODY BALRP_PKG_FOR_CUC IS
       PP_PRINTLOG(3,
                   'PP_BUILD_REPORT',
                   SQLCODE,
-                  '山东更新帐务月份处理完毕！');
+                  '山东特殊处理--更新帐务月份处理完毕！');
     
     ELSIF GC_PROVINCE = 'HB' THEN
       V_SQL := 'CREATE INDEX IDX_balrp_t19' || INV_BILLINGCYCLEID || ' ON ' ||
