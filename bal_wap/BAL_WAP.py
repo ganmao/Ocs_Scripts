@@ -9,12 +9,13 @@ from time import localtime, strftime, sleep
 import logging
 import signal
 from sys import exit
+import gc
 
 #定义部分程序默认参数
 #=============================================================================
 DB_lOGININ_TIMEOUT = 10
 DB_QUERY_TIMEOUT = 60
-SLEEP_TIME_LIMIT = 600
+SLEEP_TIME_LIMIT = 300
 #=============================================================================
 
 
@@ -56,6 +57,7 @@ def initLogging(inLogFile):
     
     return myLog
     
+    
 class InitFile(object):
     '''处理配置文件类'''
     def __init__(self, inFile='bal_wap.ini'):
@@ -81,6 +83,7 @@ class InitFile(object):
         '''获取defaults的值，即配置文件中的[DEFAULT]'''
         return self.conf.defaults()
             
+            
 class DB_JDBC(object):
     '''JDBC内部重载'''
     def __init__(self):
@@ -89,7 +92,7 @@ class DB_JDBC(object):
         '''
         self.con   = None
         self.pStmt = None
-        self.re    = None
+        self.rs    = None
         self.sql   = None
         self.fetchSize = int(ini.getConf('COMMON','FETCH_LIMIT'))
         
@@ -97,17 +100,18 @@ class DB_JDBC(object):
         '''
         类的清理，需要将数据库链接关闭
         '''
+        myLog.info(u'开始关闭JDBC！')
         del self.sql
         
         self.con.commit()
         myLog.info(u'强制提交未提交事物！')
         
-        self.re.close()
+        #self.rs.close()
         self.pStmt.close()
         self.con.close()
-        myLog.info(u'关闭数据库连接!')
+        myLog.info(u'关闭JDBC完成!')
         
-        del self.re
+        del self.rs
         del self.pStmt
         del self.con
         
@@ -120,6 +124,7 @@ class DB_JDBC(object):
             参数2           [SQL_TEMPLATE×]=>SELECT_FIELD_TYPE 解析为Dict的数据类型
         返回查询的结果
         '''
+        myLog.info(u"开始加载数据!")
         myLog.debug("sqlParam=%s" % repr(sqlParam))
         myLog.debug("_n=%d" % len(sqlParam))
         self.sql = sqlTemplate
@@ -149,6 +154,10 @@ class DB_JDBC(object):
     def fetchNext(self):
         '''选择下一条数据'''
         return self.rs.next()
+        
+    def clean(self):
+        '''清除executeQuery的数据'''
+        self.rs.close()
         
     def getString(self, inString):
         '''根据字段名称获取具体字段值，也可以根据字段位置获取'''
@@ -209,20 +218,25 @@ class DB_JDBC(object):
                 
             myLog.debug(u'数据完成初始化![%s]' % _dict)
             self.pStmt.addBatch()
+            self.pStmt.clearParameters()
             
             if (_dNumber % self.fetchSize == 0):
-                myLog.info(u'已删除数据[%d]条！' % _dNumber)
+                myLog.info(u'准备删除数据[%d]条！' % _dNumber)
                 self.pStmt.executeBatch()
+                self.pStmt.clearBatch()
                 self.con.commit()
+                myLog.info(u'删除数据[%d]条完成！' % _dNumber)
         
         myLog.debug(u'所有数据[%d]初始化完成！%s' % (_dNumber, inArray))
         
         #提交数据
-        myLog.debug(u'批量提交数据！')
+        #myLog.info(u'准备删除数据[%d]条！' % _dNumber)
         self.pStmt.executeBatch()
-        myLog.debug(u'批量Commit数据！')
+        self.pStmt.clearBatch()
         self.con.commit()
+        myLog.info(u'共删除数据[%d]条完成！' % _dNumber)
         
+        del _deleteKey
         return _dNumber
         
     def dataInsert(self, inArray, fieldTypeDict):
@@ -258,21 +272,26 @@ class DB_JDBC(object):
                     
             myLog.debug(u'数据完成初始化![%s]' % _dict)
             self.pStmt.addBatch()
+            self.pStmt.clearParameters()
             
             if ( _inumber % self.fetchSize == 0):
-                myLog.info(u'已插入数据[%d]条！' % _inumber)
+                myLog.info(u'准备插入数据[%d]条！' % _inumber)
                 self.pStmt.executeBatch()
+                self.pStmt.clearBatch()
                 self.con.commit()
+                myLog.info(u'插入数据[%d]条完成！' % _inumber)
         
         myLog.debug(u'所有数据初始化完成！%s' % inArray)
         
         #提交数据
-        myLog.debug(u'批量提交数据！')
+        #myLog.info(u'准备插入数据[%d]条！' % _inumber)
         self.pStmt.executeBatch()
-        myLog.debug(u'批量Commit数据！')
+        self.pStmt.clearBatch()
         self.con.commit()
+        myLog.info(u'共插入数据[%d]条完成！' % _inumber)
         
         return _inumber
+        
         
 class JDBC_TimesTen(DB_JDBC):
     '''TimesTen的JDBC类'''
@@ -300,8 +319,12 @@ class JDBC_TimesTen(DB_JDBC):
         #设置查询超时时间
         self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
-    def __del__(self):
+        myLog.info(u'建立TimesTen数据库链接成功！')
+        
+    def close(self):
         DB_JDBC.__del__(self)
+        myLog.info(u'关闭TimesTen数据库链接成功！')
+        
         
 class JDBC_Altibase(DB_JDBC):
     '''Altibase的JDBC类'''
@@ -333,8 +356,12 @@ class JDBC_Altibase(DB_JDBC):
         #设置查询超时时间
         self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
-    def __del__(self):
+        myLog.info(u'建立Altibase数据库链接成功！')
+        
+    def close(self):
         DB_JDBC.__del__(self)
+        myLog.info(u'关闭Altibase数据库链接成功！')
+        
         
 class JDBC_Oracle(DB_JDBC):
     '''TimesTen的JDBC类'''
@@ -365,8 +392,12 @@ class JDBC_Oracle(DB_JDBC):
         #设置查询超时时间
         self.stmt.setQueryTimeout(DB_QUERY_TIMEOUT)
         
-    def __del__(self):
+        myLog.info(u'建立Oracle数据库链接成功！')
+        
+    def close(self):
         DB_JDBC.__del__(self)
+        myLog.info(u'关闭Oracle数据库链接成功！')
+        
         
 class UpdateArray(object):
     '''需要更新的数据类'''
@@ -400,6 +431,7 @@ class UpdateArray(object):
     def clean(self):
         '''清理'''
         self.array = []
+        
         
 class SyncEngine(object):
     '''同步数据管理引擎'''
@@ -458,10 +490,13 @@ class SyncEngine(object):
         ini_sql.defaults()['update_date']=self.localTime
         ini_sql.writeConf()
         
-    def __del__(self):
+    def close(self):
+        myLog.info(u'删除同步实例')
         del self.myArray
-        del self.mdb
-        del self.ora
+        myLog.info(u'关闭MDB链接')
+        self.mdb.close()
+        myLog.info(u'关闭Oracle链接')
+        self.ora.close()
         
     def loadData(self):
         '''从MDB中获取数据'''
@@ -472,7 +507,6 @@ class SyncEngine(object):
                       
             #链接MDB数据库
             self.mdb = JDBC_TimesTen( self.mdbDsn, self.mdbUid, self.mdbPwd )
-            myLog.info(u'链接数据库成功！')
         elif (self.mdbType == 'AB'):
             myLog.info(u'从Altibase库中获取数据：[//%s:%s/%s?user=%s&password=%s&encoding=%s]'
               % (self.mdbIp, self.mdbPort, self.mdbDsn, self.mdbUid, self.mdbPwd, self.mdbEnc )
@@ -481,7 +515,6 @@ class SyncEngine(object):
             #链接MDB数据库
             self.mdb = JDBC_Altibase( self.mdbIp, self.mdbPort, self.mdbDsn,
                                      self.mdbUid, self.mdbPwd, self.mdbEnc )
-            myLog.info(u'链接数据库成功！')
         
         #解析字段类型
         ft = FiledType(ini_sql.getConf('SQL_TEMPLATE' + self.templateNumber,
@@ -501,6 +534,7 @@ class SyncEngine(object):
         #获取数据集
         self.mdb.queryData(selSqlTemplate, (self.localTime,), _dict )
         
+        myLog.info(u'开始加载数据！')
         _qNumber = 0
         while (self.mdb.fetchNext()):
             _qNumber += 1
@@ -527,19 +561,22 @@ class SyncEngine(object):
             
             if (_qNumber % int(ini.getConf('COMMON','FETCH_LIMIT')) == 0):
                 if self.syncType == 1:
+                    myLog.info(u'本批次加载数据[%s]条！' % _qNumber)
                     self.deleteData()
                     self.insertData()
                     self.myArray.clean()
-                    myLog.info(u'本批次加载数据[%s]条！' % _qNumber)
                 else:
                     myLog.info(u'当前共加载数据[%s]条！' % _qNumber)
                     
-        myLog.info(u'加载完成，共加载数据[%s]条！' % _qNumber)
+        myLog.info(u'===========加载完成，本批次共加载数据[%s]条！=============' % _qNumber)
         if self.syncType == 1:
             self.deleteData()
             self.insertData()
             self.myArray.clean()
             
+        del _dict
+        del ft
+        self.mdb.clean()
         return _qNumber
         
     def out(self):
@@ -567,6 +604,10 @@ class SyncEngine(object):
         #将更新时间写入配置文件
         #self.wConf()
         
+        del _dict
+        del ft
+        return iNumber
+        
     def deleteData(self):
         '''删除Oracle中需更新数据'''
         delSqlTemplate = ini_sql.getConf('SQL_TEMPLATE' + self.templateNumber,
@@ -583,6 +624,10 @@ class SyncEngine(object):
         myLog.info(u'开始删除数据。。。')
         iNumber = self.ora.dataDelete(self.myArray.array, _dict)
         myLog.info(u'删除数据完成！删除数据[%s]条' % iNumber)
+        
+        del _dict
+        del ft
+        return iNumber
         
 class FiledType(object):
     '''用来保存，解析字段类型的类'''
@@ -612,7 +657,8 @@ class FiledType(object):
 def sigHdTerm(n=0, e=0):
     '''当收到Kill信号后需要做的操作'''
     myLog.warning(u'收到结束信号，准备退出程序，请稍候。。。')
-    exit(2)
+    se.close()
+    exit(1)
     
 if __name__ == '__main__':
     signal.signal(signal.SIGTERM, sigHdTerm)
@@ -642,6 +688,11 @@ if __name__ == '__main__':
         
     except Exception, e:
         myLog.error(u'配置读取错误：%s' % e)
+        del sTime
+        del ini_sql
+        del defTmpNbr
+        del myLog
+        del ini
         exit(1)
     
     try:
@@ -654,26 +705,49 @@ if __name__ == '__main__':
             #开始一次同步
             for tNbr in range(1,defTmpNbr+1):
                 myLog.info(u'开始同步模板：[SQL_TEMPLATE%d]' % tNbr)
+                
                 #从MDB库中获取数据
                 se = SyncEngine(str(tNbr), procTime)
                 
                 myCount = se.loadData()
-                myLog.info(u'共获取到数据[%d]条！' % myCount)
+                
                 if ( (myCount > 0) and (se.syncType != 1) ):
+                    myLog.info(u'共获取到数据[%d]条！' % myCount)
                     #se.out()
                     #删除表中已有数据
                     se.deleteData()
                     #插入需更新数据
                     se.insertData()
                     
-                del se
-                
                 #将跟新时间点写入配置文件
                 se.wConf()
+                
+                se.close()
+                del se
+                
+                #手工进行内存碎片回收
+                gc.collect()
                 
             #同步间隔
             myLog.info(u'同步间隔休息。。。[%d]秒' % upRate)
             sleep(upRate)
     except Exception, e:
         myLog.error(u'程序异常错误，退出:%s' % e)
+        del procTime
+        del sTime
+        del ini_sql
+        del defTmpNbr
+        del myLog
+        del ini
+        del myCount
+        del se
         exit(1)
+        
+    del procTime
+    del sTime
+    del ini_sql
+    del defTmpNbr
+    del myLog
+    del ini
+    del myCount
+    del se
