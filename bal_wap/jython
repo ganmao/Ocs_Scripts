@@ -3,7 +3,9 @@ JAVA_HOME=/opt/java1.5/jre
 JYTHON_HOME=/ztesoft/ocsr11/scripts/jython
 CLASSPATH=${JYTHON_HOME}/jython.jar
 CP=/tt/TimesTen/tt70/lib/ttjdbc5.jar:/oracle/product/102/jdbc/lib/ojdbc14_g.jar:/ztesoft/altibase/altibase_home/lib/Altibase.jar
-JAVA_OPTS="-d64 -Xmx512m -Xss1024k"
+JAVA_OPTS="-d64 -Xms256M -Xmx2048m -Xss1024k"
+
+#JAVA_OPTS=${JAVA_OPTS}" -XX:+PrintGCTimeStamps -XX:+PrintGCDetails -XX:+PrintHeapAtGC -verbose:gc -Xverbosegc:file=gc.log "
 
 if [[ ! -z "$CLASSPATH" ]]
 then
