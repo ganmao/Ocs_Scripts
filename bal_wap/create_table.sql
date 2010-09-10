@@ -21,5 +21,5 @@ CREATE TABLE BAL_WAP(
     PRIMARY KEY(BAL_ID)
 ) tablespace tab_rb;
 
-CREATE INDEX bal_wap_acct_id ON bal_wap (acct_id) TABLESPACE idx_rb;
+CREATE INDEX bal_wap_bal_id ON bal_wap (bal_id) TABLESPACE idx_rb;
 --CREATE UNIQUE INDEX bal_wap_bal_code ON bal_wap (bal_code) TABLESPACE idx_rb;
